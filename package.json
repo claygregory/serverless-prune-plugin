@@ -1,0 +1,21 @@
+{
+  "name": "serverless-prune-plugin",
+  "version": "1.0.0",
+  "description": "Serverless plugin to purge old versions of deployed functions",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "bugs": {
+    "url": "https://github.com/claygregory/serverless-prune-plugin/issues"
+  },
+  "author": "Clay Gregory <clay@claygregory.com>",
+  "homepage": "https://github.com/claygregory/serverless-prune-plugin#readme",
+  "license": "MIT",
+  "dependencies": {
+    "bluebird": "^3.4.7"
+  },
+  "devDependencies": {
+    "eslint": "^3.13.1"
+  }
+}
