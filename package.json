@@ -9,7 +9,7 @@
   "bugs": {
     "url": "https://github.com/claygregory/serverless-prune-plugin/issues"
   },
-  "author": "Clay Gregory <clay@claygregory.com>",
+  "author": "Clay Gregory <clay@claygregory.com> (https://claygregory.com/)",
   "repository": "claygregory/serverless-prune-plugin",
   "homepage": "https://github.com/claygregory/serverless-prune-plugin",
   "license": "MIT",
