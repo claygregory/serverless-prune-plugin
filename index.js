@@ -37,7 +37,7 @@ class PrunePlugin {
     const selectedFunctions = this.options.function ? [this.options.function] : this.serverless.service.getAllFunctions();
     const functionNames = selectedFunctions.map(key => this.serverless.service.getFunction(key).name);
 
-    BbPromise.map(functionNames, functionName => {
+    BbPromise.mapSeries(functionNames, functionName => {
 
       const params = {
         FunctionName: functionName, 
@@ -48,15 +48,22 @@ class PrunePlugin {
         BbPromise.resolve(functionName),
         this.provider.request('Lambda', 'listVersionsByFunction', params),
         this.provider.request('Lambda', 'listAliases', params)
-      ]);
+      ]).catch(e => {
+        //ignore if function not deployed
+        if (e.statusCode === 404) return [];
+        else throw e;
+      });
 
-    }, {concurrency: 1}).each(([name, versions, aliases]) => {
+    }).each(([name, versions, aliases]) => {
+
+      if (!versions && !aliases)
+        return BbPromise.resolve();
 
       const deletionVersions = this.selectPruneVersionsForFunction(name, versions.Versions, aliases.Aliases);
       return this.deleteVersionsForFunction(name, deletionVersions);
 
     }).then(() => {
-      this.serverless.cli.log('Cleanup complete');
+      this.serverless.cli.log('Pruning complete');
     });
   }
 
