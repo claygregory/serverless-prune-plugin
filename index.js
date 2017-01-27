@@ -88,14 +88,12 @@ class PrunePlugin {
       })
       .slice(this.options.number);
 
-    const versString = versions.length - 1 != 1 ? 'versions' : 'version';
-    const aliasString = aliases.length != 1 ? 'aliases' : 'alias';
-    const delString = deletionCandidates.length != 1 ? 'versions' : 'version';
-
-    this.serverless.cli.log(`${functionName} has ${versions.length - 1} published ${versString} and ${aliases.length} ${aliasString}, ${deletionCandidates.length} ${delString} selected for deletion`);
+    const puralized = (count, single, plural) => `${count} ${count != 1 ? plural : single}`;
+    this.serverless.cli.log(`${functionName} has ${puralized(versions.length - 1, 'version', 'versions')} published and ${puralized(aliases.length, 'alias', 'aliases')}, ${puralized(deletionCandidates.length, 'version', 'versions')} selected for deletion`);
   
     return deletionCandidates;
   }
+
 }
 
 module.exports = PrunePlugin;
