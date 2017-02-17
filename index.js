@@ -37,7 +37,7 @@ class PrunePlugin {
     const selectedFunctions = this.options.function ? [this.options.function] : this.serverless.service.getAllFunctions();
     const functionNames = selectedFunctions.map(key => this.serverless.service.getFunction(key).name);
 
-    BbPromise.mapSeries(functionNames, functionName => {
+    return BbPromise.mapSeries(functionNames, functionName => {
 
       const params = {
         FunctionName: functionName, 

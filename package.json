@@ -2,21 +2,26 @@
   "name": "serverless-prune-plugin",
   "version": "1.0.2",
   "description": "Serverless plugin to purge old versions of deployed functions",
-  "main": "index.js",
-  "scripts": {
-    "lint": "eslint ."
-  },
-  "bugs": {
-    "url": "https://github.com/claygregory/serverless-prune-plugin/issues"
-  },
   "author": "Clay Gregory <clay@claygregory.com> (https://claygregory.com/)",
   "repository": "claygregory/serverless-prune-plugin",
   "homepage": "https://github.com/claygregory/serverless-prune-plugin",
   "license": "MIT",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "mocha",
+    "cover": "istanbul cover _mocha",
+    "coveralls": "npm run cover -- --report lcovonly && cat ./coverage/lcov.info | coveralls"
+  },
   "dependencies": {
     "bluebird": "^3.4.7"
   },
   "devDependencies": {
-    "eslint": "^3.13.1"
+    "coveralls": "^2.11.16",
+    "eslint": "^3.13.1",
+    "istanbul": "^0.4.5",
+    "mocha": "^3.2.0",
+    "mocha-lcov-reporter": "^1.2.0",
+    "sinon": "^1.17.7"
   }
 }
