@@ -3,6 +3,9 @@
 
 As the Serverless framework does not perform any sort of post-deployment cleanup, old versions of deployed functions are retained on AWS indefinitely. This plugin allows pruning of all but the most recent version(s) of managed functions. This plugin targets Serverless 1.x.
 
+[![Build Status](https://travis-ci.org/claygregory/serverless-prune-plugin.svg?branch=master)](https://travis-ci.org/claygregory/serverless-prune-plugin)
+[![Coverage Status](https://coveralls.io/repos/github/claygregory/serverless-prune-plugin/badge.svg?branch=master)](https://coveralls.io/github/claygregory/serverless-prune-plugin?branch=master)
+
 ## Installation
 
 Install to project via npm:
