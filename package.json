@@ -1,7 +1,7 @@
 {
   "name": "serverless-prune-plugin",
-  "version": "1.0.2",
-  "description": "Serverless plugin to purge old versions of deployed functions",
+  "version": "1.0.3",
+  "description": "Serverless plugin to delete old versions of deployed functions from AWS",
   "author": "Clay Gregory <clay@claygregory.com> (https://claygregory.com/)",
   "repository": "claygregory/serverless-prune-plugin",
   "homepage": "https://github.com/claygregory/serverless-prune-plugin",
