@@ -52,15 +52,19 @@ class PrunePlugin {
         //ignore if function not deployed
         if (e.statusCode === 404) return [];
         else throw e;
+      }).spread((name, versions, aliases) => {
+        return { name: name, versions: versions, aliases: aliases };
       });
 
-    }).each(([name, versions, aliases]) => {
+    }).each(functionResult => {
 
-      if (!versions && !aliases)
+      if (!functionResult.versions && !functionResult.aliases)
         return BbPromise.resolve();
 
-      const deletionVersions = this.selectPruneVersionsForFunction(name, versions.Versions, aliases.Aliases);
-      return this.deleteVersionsForFunction(name, deletionVersions);
+      const deletionVersions = this.selectPruneVersionsForFunction(
+        functionResult.name, functionResult.versions.Versions, functionResult.aliases.Aliases
+      );
+      return this.deleteVersionsForFunction(functionResult.name, deletionVersions);
 
     }).then(() => {
       this.serverless.cli.log('Pruning complete');
