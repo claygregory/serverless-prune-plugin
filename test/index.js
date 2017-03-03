@@ -77,7 +77,7 @@ describe('PrunePlugin', function() {
       const plugin = new PrunePlugin(serverlessStub, {});
 
       assert(plugin.commands.prune);
-      assert(plugin.commands.prune.lifecycleEvents.includes('prune'));
+      assert(plugin.commands.prune.lifecycleEvents.indexOf('prune') >= 0);
       assert.equal('function', typeof plugin.hooks['prune:prune']);
     });
 
