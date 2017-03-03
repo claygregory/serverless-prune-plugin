@@ -92,8 +92,8 @@ class PrunePlugin {
 
     const deletionCandidates = versions
       .map(f => f.Version)
-      .filter(v => v !== '$LATEST')
-      .filter(v => !aliasedVersion.includes(v))
+      .filter(v => v !== '$LATEST') //skip $LATEST
+      .filter(v => aliasedVersion.indexOf(v) === -1) //skip aliased versions
       .sort((a, b) => {
         return parseInt(b) - parseInt(a);
       })
