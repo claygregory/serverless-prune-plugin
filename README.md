@@ -47,6 +47,6 @@ sls prune --help
 
 The [Serverless Autoprune Plugin](https://github.com/arabold/serverless-autoprune-plugin) by [arabold](https://github.com/arabold) performs a similar role, but only targets Serverless 0.5.x projects.
 
-##License
+## License
 
 See the included [LICENSE](LICENSE.md) for rights and limitations under the terms of the MIT license.
