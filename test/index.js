@@ -10,13 +10,14 @@ const PrunePlugin = require('../');
 
 describe('PrunePlugin', function() {
 
-  function createMockServerless(functions) {
+  function createMockServerless(functions, serviceCustom) {
     const serverless = {
       getProvider: sinon.stub(),
       cli: { log: sinon.stub() },
       service: {
         getAllFunctions: () => functions,
         getFunction: (key) => { return { name:`service-${key}` }; },
+        custom: serviceCustom
       }
     };
     const provider = { request: sinon.stub() };
@@ -55,7 +56,7 @@ describe('PrunePlugin', function() {
 
     it('should assign correct properties', function() {
 
-      const serverlessStub = { getProvider: sinon.stub() };
+      const serverlessStub = createMockServerless([], null);
       
       const provider = { aws: 'provider' };
       const options = { option: 'a' };
@@ -70,15 +71,47 @@ describe('PrunePlugin', function() {
       assert(serverlessStub.getProvider.calledWithExactly('aws'));
     });
 
+    it('should assign any serverless.yml configured options', function() {
+
+      const serverlessStub = createMockServerless([], {
+        prune: {
+          automatic: true,
+          number: 5
+        }
+      });
+
+      const plugin = new PrunePlugin(serverlessStub, {});
+
+      assert(plugin.pluginCustom);
+      assert.equal(5, plugin.pluginCustom.number);
+      assert.equal(true, plugin.pluginCustom.automatic);
+
+      assert.equal(5, plugin.getNumber());
+    });
+
     it('should set up event hooks', function() {
 
-      const serverlessStub = { getProvider: sinon.stub() };
+      const serverlessStub = createMockServerless([], null);
 
       const plugin = new PrunePlugin(serverlessStub, {});
 
       assert(plugin.commands.prune);
       assert(plugin.commands.prune.lifecycleEvents.indexOf('prune') >= 0);
       assert.equal('function', typeof plugin.hooks['prune:prune']);
+      assert.equal('function', typeof plugin.hooks['after:deploy:deploy']);
+    });
+
+    it('should prioritize CLI provided n over serverless.yml value', function() {
+
+      const serverlessStub = createMockServerless([], {
+        prune: { automatic: true, number: 5 }
+      });
+
+      const plugin = new PrunePlugin(serverlessStub, { number: 7 });
+
+      assert(plugin.pluginCustom);
+      assert.equal(5, plugin.pluginCustom.number);
+      assert.equal(7, plugin.getNumber());
     });
 
   });
@@ -142,7 +175,9 @@ describe('PrunePlugin', function() {
 
     it('should keep requested number of version', function() {
 
-      const serverless = createMockServerless(['FunctionA']);
+      const serverless = createMockServerless(['FunctionA'], {
+        prune: { automatic: true, number: 5 }
+      });
       const plugin = new PrunePlugin(serverless, { number: 3 });
       
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
