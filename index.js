@@ -60,7 +60,7 @@ class PrunePlugin {
 
   postDeploy() {
     if (this.pluginCustom.automatic && this.pluginCustom.number >= 1) {
-      this.serverless.cli.log('Running post-deployment pruning');
+      this.serverless.cli.log('Prune: Running post-deployment pruning');
       return this.prune();
     } else {
       return BbPromise.resolve();
@@ -71,6 +71,8 @@ class PrunePlugin {
 
     const selectedFunctions = this.options.function ? [this.options.function] : this.serverless.service.getAllFunctions();
     const functionNames = selectedFunctions.map(key => this.serverless.service.getFunction(key).name);
+
+    this.serverless.cli.log('Prune: Querying for deployed versions');
 
     return BbPromise.mapSeries(functionNames, functionName => {
 
@@ -102,7 +104,7 @@ class PrunePlugin {
       return this.deleteVersionsForFunction(functionResult.name, deletionVersions);
 
     }).then(() => {
-      this.serverless.cli.log('Pruning complete');
+      this.serverless.cli.log('Prune: Pruning complete');
     });
   }
 
@@ -110,7 +112,7 @@ class PrunePlugin {
     
     return BbPromise.each(versions, version => {
       
-      this.serverless.cli.log(`Deleting ${functionName} v${version}...`);
+      this.serverless.cli.log(`Prune: Deleting ${functionName} v${version}...`);
 
       const params = {
         FunctionName: functionName, 
@@ -135,7 +137,7 @@ class PrunePlugin {
       .slice(this.getNumber());
 
     const puralized = (count, single, plural) => `${count} ${count != 1 ? plural : single}`;
-    this.serverless.cli.log(`${functionName} has ${puralized(versions.length - 1, 'version', 'versions')} published and ${puralized(aliases.length, 'alias', 'aliases')}, ${puralized(deletionCandidates.length, 'version', 'versions')} selected for deletion`);
+    this.serverless.cli.log(`Prune: ${functionName} has ${puralized(versions.length - 1, 'version', 'versions')} published and ${puralized(aliases.length, 'alias', 'aliases')}, ${puralized(deletionCandidates.length, 'version', 'versions')} selected for deletion`);
   
     return deletionCandidates;
   }
