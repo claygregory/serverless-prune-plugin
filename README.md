@@ -36,6 +36,20 @@ A single function can be targeted for cleanup:
 sls prune -n <number of version to keep> -f <function name>
 ```
 
+### Automatic Pruning
+
+This plugin can also be configured to run automatically, following a deployment. Configuration of automatic pruning is within the `custom` property of `serverless.yml`. For example:
+
+```yaml
+custom:
+  prune:
+    automatic: true
+    number: 3
+```
+
+To run automatically, the `automatic` property of `prune` must be set to `true` and the `number` of versions to keep must be specified.
+
+
 ### Additional Help
 
 See:
