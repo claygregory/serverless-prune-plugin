@@ -8,6 +8,8 @@ class PrunePlugin {
     this.options = options || {};
     this.provider = this.serverless.getProvider('aws');
 
+    this.pluginCustom = this.loadCustom(this.serverless.service.custom);
+
     this.commands = {
       prune: {
         usage: 'Cleans up previously deployed function versions',
@@ -28,8 +30,41 @@ class PrunePlugin {
     };
 
     this.hooks = {
-      'prune:prune': this.prune.bind(this)
+      'prune:prune': this.prune.bind(this),
+      'after:deploy:deploy': this.postDeploy.bind(this)
     };
+
+  }
+
+  getNumber() {
+    return this.options.number || this.pluginCustom.number;
+  }
+
+  loadCustom(custom) {
+    const pluginCustom = {};
+    if (custom && custom.prune) {
+
+      if (custom.prune.number != null) {
+        const number = parseInt(custom.prune.number);
+        if (!isNaN(number)) pluginCustom.number = number;
+      }
+
+      if (custom.prune.automatic != null && typeof custom.prune.automatic === 'boolean') {
+        pluginCustom.automatic = custom.prune.automatic;
+      }
+
+    }
+
+    return pluginCustom;
+  }
+
+  postDeploy() {
+    if (this.pluginCustom.automatic && this.pluginCustom.number >= 1) {
+      this.serverless.cli.log('Running post-deployment pruning');
+      return this.prune();
+    } else {
+      return BbPromise.resolve();
+    }
   }
 
   prune() {
@@ -97,7 +132,7 @@ class PrunePlugin {
       .sort((a, b) => {
         return parseInt(b) - parseInt(a);
       })
-      .slice(this.options.number);
+      .slice(this.getNumber());
 
     const puralized = (count, single, plural) => `${count} ${count != 1 ? plural : single}`;
     this.serverless.cli.log(`${functionName} has ${puralized(versions.length - 1, 'version', 'versions')} published and ${puralized(aliases.length, 'alias', 'aliases')}, ${puralized(deletionCandidates.length, 'version', 'versions')} selected for deletion`);
