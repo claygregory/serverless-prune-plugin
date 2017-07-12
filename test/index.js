@@ -273,8 +273,6 @@ describe('PrunePlugin', function() {
 
     });
 
-
-
     it('should only operate on target function if specified from CLI', function() {
 
       const serverless = createMockServerless(['FunctionA', 'FunctionB', 'FunctionC']);
@@ -291,6 +289,38 @@ describe('PrunePlugin', function() {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionB'));
       });
 
+    });
+
+  });
+
+  describe('postDeploy', function() {
+
+    it('should prune if automatic is option is configured', function() {
+
+      const custom = {
+        prune: { automatic: true, number: 10 }
+      };
+      const serverlessStub = createMockServerless([], custom);
+
+      const plugin = new PrunePlugin(serverlessStub, {});
+      sinon.spy(plugin, 'prune');
+
+      plugin.postDeploy().then(() => {
+        sinon.assert.calledOnce(plugin.prune);
+      });
+    });
+
+    it('should not prune if noDeploy flag is set', function() {
+
+      const serverlessStub = createMockServerless([], null);
+
+      const options = { noDeploy: true };
+      const plugin = new PrunePlugin(serverlessStub, options);
+      sinon.spy(plugin, 'prune');
+
+      plugin.postDeploy().then(() => {
+        sinon.assert.notCalled(plugin.prune);
+      });
     });
 
   });
