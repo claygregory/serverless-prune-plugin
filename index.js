@@ -59,6 +59,11 @@ class PrunePlugin {
   }
 
   postDeploy() {
+
+    if (this.options.noDeploy === true) {
+      return BbPromise.resolve();
+    }
+
     if (this.pluginCustom.automatic && this.pluginCustom.number >= 1) {
       this.serverless.cli.log('Prune: Running post-deployment pruning');
       return this.prune();
