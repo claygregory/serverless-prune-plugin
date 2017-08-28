@@ -124,7 +124,12 @@ class PrunePlugin {
         Qualifier: version
       };
       
-      return this.provider.request('Lambda', 'deleteFunction', params);
+      return this.provider.request('Lambda', 'deleteFunction', params)
+      .catch(e => {
+        //ignore if trying to delete replicated lambda edge function
+        if (e.statusCode === 400 && e.message.startsWith('Lambda was unable to delete') && e.message.endsWith('because it is a replicated function.')) this.serverless.cli.log(`Prune: Unable deleting replicated edge function ${functionName} v${version}...`);
+        else throw e;
+      });
     });
   }
 
