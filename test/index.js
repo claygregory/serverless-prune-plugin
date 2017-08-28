@@ -149,6 +149,38 @@ describe('PrunePlugin', function() {
     });
   });
 
+  describe('deleteVersionsForFunction - lambda edge', function() {
+
+    let serverless;
+    let plugin;
+    beforeEach(function() {
+      serverless = createMockServerless();
+      plugin = new PrunePlugin(serverless, {});
+    });
+
+    it('should ignore failure while deleting lambda edge function', function(done) {
+
+      plugin.provider.request.withArgs('Lambda', 'deleteFunction', sinon.match.any)
+        .returns(BbPromise.reject({ statusCode: 400, message: 'Lambda was unable to delete arn:aws:lambda:REGION:ACCOUNT_ID:function:FUNCTION_NAME:FUNCTION_VERSION because it is a replicated function.' }));
+
+      plugin.deleteVersionsForFunction('MyEdgeFunction', [1])
+      .then(() => done())
+      .catch(() => done(new Error('shouldn\'t fail')));
+
+    });
+
+    it('should fail when error while deleting regular lambda function', function(done) {
+
+      plugin.provider.request.withArgs('Lambda', 'deleteFunction', sinon.match.any)
+        .returns(BbPromise.reject({ statusCode: 400, message: 'Some Error' }));
+
+      plugin.deleteVersionsForFunction('MyFunction', [1])
+      .then(() => done(new Error('should fail')))
+      .catch(() => done());
+
+    });
+  });
+
   describe('prune', function() {
 
     const functionMatcher = (name) => sinon.match.has('FunctionName', name);
