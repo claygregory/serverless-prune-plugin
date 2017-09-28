@@ -29,6 +29,8 @@ sls prune -n <number of version to keep>
 
 This will delete all but the `n`-most recent versions of each function deployed. Versions referenced by an alias are automatically preserved.
 
+**Note:** This plugin will currently prune no more than 50 versions per run. If installed to a project with an existing backlog of versions, multiple passes may be necessary. Once executed on a frequent or automatic basis, this limitation is of no concern.
+
 ### Single Function
 
 A single function can be targeted for cleanup:
