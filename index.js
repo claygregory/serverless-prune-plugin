@@ -24,6 +24,11 @@ class PrunePlugin {
             usage: 'Only prune the specified function")',
             shortcut: 'f',
             required: false
+          },
+          dryRun: {
+            usage: 'Dry-run, only list candidate versions for deletion ")',
+            shortcut: 'd',
+            required: false
           }
         }
       },
@@ -81,15 +86,10 @@ class PrunePlugin {
 
     return BbPromise.mapSeries(functionNames, functionName => {
 
-      const params = {
-        FunctionName: functionName, 
-        MaxItems: 200
-      };
-
       return BbPromise.all([
         BbPromise.resolve(functionName),
-        this.provider.request('Lambda', 'listVersionsByFunction', params),
-        this.provider.request('Lambda', 'listAliases', params)
+        this.listVersionForFunction(functionName),
+        this.listAliasesForFunction(functionName)
       ]).catch(e => {
         //ignore if function not deployed
         if (e.statusCode === 404) return [];
@@ -106,10 +106,16 @@ class PrunePlugin {
       const deletionVersions = this.selectPruneVersionsForFunction(
         functionResult.name, functionResult.versions.Versions, functionResult.aliases.Aliases
       );
-      return this.deleteVersionsForFunction(functionResult.name, deletionVersions);
+
+      if (this.options.dryRun) {
+        return BbPromise.resolve();
+      } else {
+        return this.deleteVersionsForFunction(functionResult.name, deletionVersions);
+      }
 
     }).then(() => {
-      this.serverless.cli.log('Prune: Pruning complete');
+      const actions = this.options.dryRun ? ' Dry-run, no actions taken.' : '';
+      this.serverless.cli.log('Prune: Pruning complete.' + actions);
     });
   }
 
@@ -132,6 +138,22 @@ class PrunePlugin {
         else throw e;
       });
     });
+  }
+
+  listAliasesForFunction(functionName) {
+    const params = {
+      FunctionName: functionName
+    };
+
+    return this.provider.request('Lambda', 'listAliases', params);
+  }
+
+  listVersionForFunction(functionName) {
+    const params = {
+      FunctionName: functionName
+    };
+
+    return this.provider.request('Lambda', 'listVersionsByFunction', params);
   }
 
   selectPruneVersionsForFunction(functionName, versions, aliases) {
