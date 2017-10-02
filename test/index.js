@@ -131,7 +131,7 @@ describe('PrunePlugin', function() {
         Qualifier: ver
       });
 
-      plugin.deleteVersionsForFunction('MyFunction', ['1', '2', '3']).then(() => {
+      return plugin.deleteVersionsForFunction('MyFunction', ['1', '2', '3']).then(() => {
         sinon.assert.callCount(plugin.provider.request, 3);
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('1'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('2'));
@@ -142,7 +142,7 @@ describe('PrunePlugin', function() {
 
     it('should not request deletions if provided versions array is empty', function() {
 
-      plugin.deleteVersionsForFunction('MyFunction', []).then(() => {
+      return plugin.deleteVersionsForFunction('MyFunction', []).then(() => {
         sinon.assert.notCalled(plugin.provider.request);
       });
 
@@ -197,7 +197,7 @@ describe('PrunePlugin', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      plugin.prune().then(() => {
+      return plugin.prune().then(() => {
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('1'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('2'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('3'));
@@ -218,7 +218,7 @@ describe('PrunePlugin', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      plugin.prune().then(() => {
+      return plugin.prune().then(() => {
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('1'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('2'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('3'));
@@ -238,7 +238,7 @@ describe('PrunePlugin', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([1, 3]));
 
-      plugin.prune().then(() => {
+      return plugin.prune().then(() => {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('$LATEST'));
       });
 
@@ -255,7 +255,7 @@ describe('PrunePlugin', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([1, 3, 4]));
 
-      plugin.prune().then(() => {
+      return plugin.prune().then(() => {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('1'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('3'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('5'));
@@ -277,7 +277,7 @@ describe('PrunePlugin', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      plugin.prune().then(() => {
+      return plugin.prune().then(() => {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionA'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionB'));
       });
@@ -298,7 +298,7 @@ describe('PrunePlugin', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      plugin.prune().then(() => {
+      return plugin.prune().then(() => {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionA'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionB'));
       });
@@ -316,9 +316,27 @@ describe('PrunePlugin', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      plugin.prune().then(() => {
+      return plugin.prune().then(() => {
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionA'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionB'));
+      });
+
+    });
+
+    it('should not perform any deletions if dryRun flag is set', function() {
+
+      const serverless = createMockServerless(['FunctionA', 'FunctionB', 'FunctionC']);
+      const plugin = new PrunePlugin(serverless, {  number: 1, dryRun: true });
+      sinon.spy(plugin, 'deleteVersionsForFunction');
+      
+      plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
+        .returns(createVersionsResponse([1, 2, 3, 4, 5]));
+
+      plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
+        .returns(createAliasResponse([]));
+
+      return plugin.prune().then(() => {
+        sinon.assert.notCalled(plugin.deleteVersionsForFunction);
       });
 
     });
@@ -337,7 +355,7 @@ describe('PrunePlugin', function() {
       const plugin = new PrunePlugin(serverlessStub, {});
       sinon.spy(plugin, 'prune');
 
-      plugin.postDeploy().then(() => {
+      return plugin.postDeploy().then(() => {
         sinon.assert.calledOnce(plugin.prune);
       });
     });
@@ -350,7 +368,7 @@ describe('PrunePlugin', function() {
       const plugin = new PrunePlugin(serverlessStub, options);
       sinon.spy(plugin, 'prune');
 
-      plugin.postDeploy().then(() => {
+      return plugin.postDeploy().then(() => {
         sinon.assert.notCalled(plugin.prune);
       });
     });
