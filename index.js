@@ -21,12 +21,12 @@ class PrunePlugin {
             required: true
           },
           function: {
-            usage: 'Only prune the specified function")',
+            usage: 'Only prune the specified function',
             shortcut: 'f',
             required: false
           },
           dryRun: {
-            usage: 'Dry-run, only list candidate versions for deletion ")',
+            usage: 'Dry-run, only list candidate versions for deletion',
             shortcut: 'd',
             required: false
           }
@@ -86,23 +86,25 @@ class PrunePlugin {
 
     return BbPromise.mapSeries(functionNames, functionName => {
 
-      return BbPromise.all([
-        BbPromise.resolve(functionName),
+      return BbPromise.join(
         this.listVersionForFunction(functionName),
-        this.listAliasesForFunction(functionName)
-      ]).spread((name, versions, aliases) => {
-        return { name: name, versions: versions, aliases: aliases };
-      });
+        this.listAliasesForFunction(functionName),
+        (versions, aliases) => ( { name: functionName, versions: versions, aliases: aliases } )
+      );
 
     }).each(functionResult => {
 
       if (!functionResult.versions.length)
         return BbPromise.resolve();
 
-      const deletionVersions = this.selectPruneVersionsForFunction(
-        functionResult.name, functionResult.versions, functionResult.aliases
-      );
+      const deletionVersions = this.selectPruneVersionsForFunction(functionResult.versions, functionResult.aliases);
 
+      const puralized = (count, single, plural) => `${count} ${count != 1 ? plural : single}`;
+
+      const nonLatestVersionCount = functionResult.versions.length - 1;
+      const aliasCount = functionResult.aliases.length;
+      this.serverless.cli.log(`Prune: ${functionResult.name} has ${puralized(nonLatestVersionCount, 'additional version', 'additional versions')} published and ${puralized(aliasCount, 'alias', 'aliases')}, ${puralized(deletionVersions.length, 'version', 'versions')} selected for deletion`);
+  
       if (this.options.dryRun) {
         return BbPromise.resolve();
       } else {
@@ -110,8 +112,8 @@ class PrunePlugin {
       }
 
     }).then(() => {
-      const actions = this.options.dryRun ? ' Dry-run, no actions taken.' : '';
-      this.serverless.cli.log('Prune: Pruning complete.' + actions);
+      const actions = this.options.dryRun ? 'Dry-run complete, no actions taken.' : 'Pruning complete.';
+      this.serverless.cli.log('Prune: ' + actions);
     });
   }
 
@@ -182,7 +184,7 @@ class PrunePlugin {
       .then(responseHandler);
   }
 
-  selectPruneVersionsForFunction(functionName, versions, aliases) {
+  selectPruneVersionsForFunction(versions, aliases) {
 
     const aliasedVersion = aliases.map(a => a.FunctionVersion);
 
@@ -190,14 +192,9 @@ class PrunePlugin {
       .map(f => f.Version)
       .filter(v => v !== '$LATEST') //skip $LATEST
       .filter(v => aliasedVersion.indexOf(v) === -1) //skip aliased versions
-      .sort((a, b) => {
-        return parseInt(b) - parseInt(a);
-      })
+      .sort((a, b) => parseInt(b) - parseInt(a))
       .slice(this.getNumber());
 
-    const puralized = (count, single, plural) => `${count} ${count != 1 ? plural : single}`;
-    this.serverless.cli.log(`Prune: ${functionName} has ${puralized(versions.length - 1, 'version', 'versions')} published and ${puralized(aliases.length, 'alias', 'aliases')}, ${puralized(deletionCandidates.length, 'version', 'versions')} selected for deletion`);
-  
     return deletionCandidates;
   }
 
