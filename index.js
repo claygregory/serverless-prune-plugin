@@ -90,21 +90,17 @@ class PrunePlugin {
         BbPromise.resolve(functionName),
         this.listVersionForFunction(functionName),
         this.listAliasesForFunction(functionName)
-      ]).catch(e => {
-        //ignore if function not deployed
-        if (e.statusCode === 404) return [];
-        else throw e;
-      }).spread((name, versions, aliases) => {
+      ]).spread((name, versions, aliases) => {
         return { name: name, versions: versions, aliases: aliases };
       });
 
     }).each(functionResult => {
 
-      if (!functionResult.versions && !functionResult.aliases)
+      if (!functionResult.versions.length)
         return BbPromise.resolve();
 
       const deletionVersions = this.selectPruneVersionsForFunction(
-        functionResult.name, functionResult.versions.Versions, functionResult.aliases.Aliases
+        functionResult.name, functionResult.versions, functionResult.aliases
       );
 
       if (this.options.dryRun) {
@@ -145,7 +141,12 @@ class PrunePlugin {
       FunctionName: functionName
     };
 
-    return this.provider.request('Lambda', 'listAliases', params);
+    return this.makeLambdaRequest('listAliases', params, r => r.Aliases)
+      .catch(e => {
+        //ignore if function not deployed
+        if (e.statusCode === 404) return [];
+        else throw e;
+      });
   }
 
   listVersionForFunction(functionName) {
@@ -153,7 +154,32 @@ class PrunePlugin {
       FunctionName: functionName
     };
 
-    return this.provider.request('Lambda', 'listVersionsByFunction', params);
+    return this.makeLambdaRequest('listVersionsByFunction', params, r => r.Versions)
+      .catch(e => {
+        //ignore if function not deployed
+        if (e.statusCode === 404) return [];
+        else throw e;
+      });
+  }
+
+  makeLambdaRequest(action, params, responseMapping) {
+    
+    const results = [];
+    const responseHandler = response => {
+
+      Array.prototype.push.apply(results, responseMapping(response));
+
+      if (response.NextMarker) {
+        return this.provider.request('Lambda', action, Object.assign({}, params, { Marker: response.NextMarker }))
+          .then(responseHandler);
+
+      } else {
+        return BbPromise.resolve(results);
+      }
+    };
+
+    return this.provider.request('Lambda', action, params)
+      .then(responseHandler);
   }
 
   selectPruneVersionsForFunction(functionName, versions, aliases) {
