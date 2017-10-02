@@ -292,6 +292,9 @@ describe('PrunePlugin', function() {
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionA'))
         .returns(BbPromise.reject({ statusCode: 404 }));
 
+      plugin.provider.request.withArgs('Lambda', 'listAliases', functionMatcher('service-FunctionA'))
+        .returns(BbPromise.reject({ statusCode: 404 }));
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionB'))
         .returns(createVersionsResponse([1, 2, 3]));
 
