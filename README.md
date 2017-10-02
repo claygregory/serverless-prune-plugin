@@ -29,8 +29,6 @@ sls prune -n <number of version to keep>
 
 This will delete all but the `n`-most recent versions of each function deployed. Versions referenced by an alias are automatically preserved.
 
-**Note:** This plugin will currently prune no more than 50 versions per run. If installed to a project with an existing backlog of versions, multiple passes may be necessary. Once executed on a frequent or automatic basis, this limitation is of no concern.
-
 ### Single Function
 
 A single function can be targeted for cleanup:
@@ -52,6 +50,13 @@ custom:
 To run automatically, the `automatic` property of `prune` must be set to `true` and the `number` of versions to keep must be specified.
 
 
+### Dry Run
+
+A dry-run will preview the deletion candidates, without actually performing the pruning operations:
+```
+sls prune -n <number of version to keep> --dryRun
+```
+
 ### Additional Help
 
 See:
@@ -61,7 +66,7 @@ sls prune --help
 
 ## See Also
 
-The [Serverless Autoprune Plugin](https://github.com/arabold/serverless-autoprune-plugin) by [arabold](https://github.com/arabold) performs a similar role, but only targets Serverless 0.5.x projects.
+The [Serverless Autoprune Plugin](https://github.com/arabold/serverless-autoprune-plugin) by [arabold](https://github.com/arabold) performs a similar role, but targets Serverless 0.5.x projects.
 
 ## License
 
