@@ -3,7 +3,6 @@
 /* eslint-env node, mocha */
 
 const assert = require('assert');
-const BbPromise = require('bluebird');
 const sinon = require('sinon');
 
 const PrunePlugin = require('../');
@@ -161,22 +160,22 @@ describe('PrunePlugin', function() {
     it('should ignore failure while deleting lambda edge function', function(done) {
 
       plugin.provider.request.withArgs('Lambda', 'deleteFunction', sinon.match.any)
-        .returns(BbPromise.reject({ statusCode: 400, message: 'Lambda was unable to delete arn:aws:lambda:REGION:ACCOUNT_ID:function:FUNCTION_NAME:FUNCTION_VERSION because it is a replicated function.' }));
+        .rejects({ statusCode: 400, message: 'Lambda was unable to delete arn:aws:lambda:REGION:ACCOUNT_ID:function:FUNCTION_NAME:FUNCTION_VERSION because it is a replicated function.' });
 
       plugin.deleteVersionsForFunction('MyEdgeFunction', [1])
-      .then(() => done())
-      .catch(() => done(new Error('shouldn\'t fail')));
+        .then(() => done())
+        .catch(() => done(new Error('shouldn\'t fail')));
 
     });
 
     it('should fail when error while deleting regular lambda function', function(done) {
 
       plugin.provider.request.withArgs('Lambda', 'deleteFunction', sinon.match.any)
-        .returns(BbPromise.reject({ statusCode: 400, message: 'Some Error' }));
+        .rejects({ statusCode: 400, message: 'Some Error' });
 
       plugin.deleteVersionsForFunction('MyFunction', [1])
-      .then(() => done(new Error('should fail')))
-      .catch(() => done());
+        .then(() => done(new Error('should fail')))
+        .catch(() => done());
 
     });
   });
@@ -290,10 +289,10 @@ describe('PrunePlugin', function() {
       const plugin = new PrunePlugin(serverless, { number: 1 });
       
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionA'))
-        .returns(BbPromise.reject({ statusCode: 404 }));
+        .rejects({ statusCode: 404 });
 
       plugin.provider.request.withArgs('Lambda', 'listAliases', functionMatcher('service-FunctionA'))
-        .returns(BbPromise.reject({ statusCode: 404 }));
+        .rejects({ statusCode: 404 });
 
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionB'))
         .returns(createVersionsResponse([1, 2, 3]));
