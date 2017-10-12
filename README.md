@@ -33,7 +33,14 @@ This will delete all but the `n`-most recent versions of each function deployed.
 
 A single function can be targeted for cleanup:
 ```
-sls prune -n <number of version to keep> -f <function name>
+sls prune -n <number of version to keep> -f helloWorld
+```
+
+### Region/Stage
+
+The previous usage examples prune the default stage in the default region. Use `--stage` and `--region` to specify: 
+```
+sls prune -n <number of version to keep> --stage production --region eu-central-1
 ```
 
 ### Automatic Pruning

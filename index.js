@@ -12,21 +12,29 @@ class PrunePlugin {
 
     this.commands = {
       prune: {
-        usage: 'Cleans up previously deployed function versions',
+        usage: 'Clean up deployed functions by deleting older versions.',
         lifecycleEvents: ['prune'],
         options: {
           number: {
-            usage: 'Specify the number of previous versions to keep',
+            usage: 'Number of previous versions to keep',
             shortcut: 'n',
             required: true
           },
+          stage: {
+            usage: 'Stage of the service',
+            shortcut: 's',
+          },
+          region: {
+            usage: 'Region of the service',
+            shortcut: 'r',
+          },
           function: {
-            usage: 'Only prune the specified function',
+            usage: 'Function name. Limits cleanup to the specified function',
             shortcut: 'f',
             required: false
           },
           dryRun: {
-            usage: 'Dry-run, only list candidate versions for deletion',
+            usage: 'Dry-run. Lists deletion candidates',
             shortcut: 'd',
             required: false
           }
