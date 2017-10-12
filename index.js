@@ -2,7 +2,7 @@
 
 const BbPromise = require('bluebird');
 
-class PrunePlugin {
+class Prune {
   constructor(serverless, options) {
     this.serverless = serverless;
     this.options = options || {};
@@ -208,4 +208,4 @@ class PrunePlugin {
 
 }
 
-module.exports = PrunePlugin;
+module.exports = Prune;

@@ -7,7 +7,7 @@ const sinon = require('sinon');
 
 const PrunePlugin = require('../');
 
-describe('PrunePlugin', function() {
+describe('Prune', function() {
 
   function createMockServerless(functions, serviceCustom) {
     const serverless = {
