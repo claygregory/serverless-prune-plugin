@@ -9,21 +9,26 @@ Following deployment, the Serverless Framework does not purge previous versions 
 
 ## Installation
 
-Install to project via npm:
-```
+Install with **npm**:
+```sh
 npm install --save-dev serverless-prune-plugin
 ```
 
-Add the plugin to your `serverless.yml` file:
+And then add the plugin to your `serverless.yml` file:
 ```yaml
 plugins:
   - serverless-prune-plugin
 ```
 
+Alternatively, install with the Serverless **plugin command** (Serverless Framework 1.22 or higher):
+```sh
+sls plugin install -n serverless-prune-plugin
+```
+
 ## Usage
 
 In the project root, run:
-```
+```sh
 sls prune -n <number of version to keep>
 ```
 
@@ -32,14 +37,14 @@ This will delete all but the `n`-most recent versions of each function deployed.
 ### Single Function
 
 A single function can be targeted for cleanup:
-```
+```sh
 sls prune -n <number of version to keep> -f helloWorld
 ```
 
 ### Region/Stage
 
 The previous usage examples prune the default stage in the default region. Use `--stage` and `--region` to specify: 
-```
+```sh
 sls prune -n <number of version to keep> --stage production --region eu-central-1
 ```
 
@@ -60,14 +65,14 @@ To run automatically, the `automatic` property of `prune` must be set to `true` 
 ### Dry Run
 
 A dry-run will preview the deletion candidates, without actually performing the pruning operations:
-```
+```sh
 sls prune -n <number of version to keep> --dryRun
 ```
 
 ### Additional Help
 
 See:
-```
+```sh
 sls prune --help
 ```
 
