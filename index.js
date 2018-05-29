@@ -72,6 +72,7 @@ class Prune {
   }
 
   postDeploy() {
+    this.pluginCustom = this.loadCustom(this.serverless.service.custom);
 
     if (this.options.noDeploy === true) {
       return BbPromise.resolve();
