@@ -160,7 +160,7 @@ describe('Prune', function() {
     it('should ignore failure while deleting lambda edge function', function(done) {
 
       plugin.provider.request.withArgs('Lambda', 'deleteFunction', sinon.match.any)
-        .rejects({ statusCode: 400, message: 'Lambda was unable to delete arn:aws:lambda:REGION:ACCOUNT_ID:function:FUNCTION_NAME:FUNCTION_VERSION because it is a replicated function.' });
+        .rejects({ statusCode: 400, message: 'Lambda was unable to delete arn:aws:lambda:REGION:ACCOUNT_ID:function:FUNCTION_NAME:FUNCTION_VERSION because it is a replicated function. Please see our documentation for Deleting Lambda@Edge Functions and Replicas.' });
 
       plugin.deleteVersionsForFunction('MyEdgeFunction', [1])
         .then(() => done())
