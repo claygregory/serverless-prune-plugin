@@ -201,7 +201,7 @@ class Prune {
       .map(f => f.Version)
       .filter(v => v !== '$LATEST') //skip $LATEST
       .filter(v => aliasedVersion.indexOf(v) === -1) //skip aliased versions
-      .sort((a, b) => parseInt(b) - parseInt(a))
+      .sort((a, b) => parseInt(a) === parseInt(b) ? 0 : parseInt(a) > parseInt(b) ? -1 : 1)
       .slice(this.getNumber());
 
     return deletionCandidates;
