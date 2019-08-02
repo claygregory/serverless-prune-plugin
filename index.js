@@ -76,6 +76,14 @@ class Prune {
         pluginCustom.automatic = custom.prune.automatic;
       }
 
+      if (custom.prune.includeLayers != null && typeof custom.prune.includeLayers === 'boolean') {
+        pluginCustom.includeLayers = custom.prune.includeLayers;
+      }
+
+      if (custom.prune.layer != null) {
+        pluginCustom.layer = custom.prune.layer;
+      }
+
     }
 
     return pluginCustom;
