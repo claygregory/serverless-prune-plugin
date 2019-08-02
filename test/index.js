@@ -393,22 +393,6 @@ describe('Prune', function() {
 
     });
 
-    it('should not delete layers that do not exist', function () {
-
-      const serverless = createMockServerlessWithLayers(['LayerA']);
-      const plugin = new PrunePlugin(serverless, { number: 2 });
-
-      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', sinon.match.any)
-        .returns(createLayerVersionsResponse([1, 2, 3, 4, 5]));
-
-      return plugin.pruneLayers().then(() => {
-        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('1'));
-        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('2'));
-        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('3'));
-      });
-
-    });
-
     it('should keep requested number of version', function () {
 
       const serverless = createMockServerlessWithLayers(['LayerA'], {
