@@ -80,10 +80,6 @@ class Prune {
         pluginCustom.includeLayers = custom.prune.includeLayers;
       }
 
-      if (custom.prune.layer != null) {
-        pluginCustom.layer = custom.prune.layer;
-      }
-
     }
 
     return pluginCustom;

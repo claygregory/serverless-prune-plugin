@@ -379,7 +379,23 @@ describe('Prune', function() {
 
     it('should delete old versions of layers', function () {
 
-      const serverless = createMockServerlessWithLayers(['LayerA', 'LayerB'], { prune: { includeLayers: true } });
+      const serverless = createMockServerlessWithLayers(['LayerA', 'LayerB'], { prune: { includeLayers: true }});
+      const plugin = new PrunePlugin(serverless, { number: 2, includeLayers: true });
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', sinon.match.any)
+        .returns(createLayerVersionsResponse([1, 2, 3, 4, 5]));
+
+      return plugin.pruneLayers().then(() => {
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('1'));
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('2'));
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('3'));
+      });
+
+    });
+
+    it('should not delete layers that do not exist', function () {
+
+      const serverless = createMockServerlessWithLayers(['LayerA']);
       const plugin = new PrunePlugin(serverless, { number: 2 });
 
       plugin.provider.request.withArgs('Lambda', 'listLayerVersions', sinon.match.any)
@@ -473,7 +489,7 @@ describe('Prune', function() {
       plugin.provider.request.withArgs('Lambda', 'listLayerVersions', sinon.match.any)
         .returns(createLayerVersionsResponse([1, 2, 3, 4, 5]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneLayers().then(() => {
         sinon.assert.notCalled(plugin.deleteVersionsForLayer);
       });
 
@@ -482,7 +498,7 @@ describe('Prune', function() {
 
   describe('postDeploy', function() {
 
-    it('should prune if automatic is option is configured', function() {
+    it('should prune functions if automatic is option is configured', function() {
 
       const custom = {
         prune: { automatic: true, number: 10 }
@@ -497,7 +513,7 @@ describe('Prune', function() {
       });
     });
 
-    it('should not prune if noDeploy flag is set', function() {
+    it('should not prune functions if noDeploy flag is set', function() {
 
       const serverlessStub = createMockServerless([], null);
 
@@ -509,6 +525,18 @@ describe('Prune', function() {
         sinon.assert.notCalled(plugin.prune);
       });
     });
+
+    it('should not prune layers if no option is set', function() {
+      const serverlessStub = createMockServerlessWithLayers([], null);
+
+      const options = { automatic: true };
+      const plugin = new PrunePlugin(serverlessStub, options);
+      sinon.spy(plugin, 'pruneLayers');
+
+      return plugin.postDeploy().then(() => {
+        sinon.assert.notCalled(plugin.pruneLayers);
+      });
+    })
 
   });
 
