@@ -61,6 +61,17 @@ custom:
 
 To run automatically, the `automatic` property of `prune` must be set to `true` and the `number` of versions to keep must be specified.
 
+### Layers
+
+This plugin can also prune Lambda Layers in the same manner that it prunes functions. You can specify a Lambda Layer, or add the flag, `includeLayers`:
+
+```yaml
+custom:
+  prune:
+    automatic: true
+    includeLayers: true
+    number: 3
+```
 
 ### Dry Run
 
