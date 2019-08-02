@@ -9,6 +9,22 @@ const PrunePlugin = require('../');
 
 describe('Prune', function() {
 
+  function createMockServerlessWithLayers(layers, serviceCustom) {
+    let serverless = createMockServerless([], serviceCustom);
+    const { service } = serverless;
+
+    const withLayers = Object.assign(
+      serverless.service, 
+      service, 
+      { 
+        getAllLayers: () => layers,
+        getLayer: (key) => { return { name: `layer-${key}` }; },
+      }
+    );
+
+    return Object.assign(serverless, {...withLayers});
+  }
+
   function createMockServerless(functions, serviceCustom) {
     const serverless = {
       getProvider: sinon.stub(),
@@ -46,6 +62,18 @@ describe('Prune', function() {
         Version: '' + v,
         Description: `Alias v${v}`
       };
+    });
+
+    return Promise.resolve(resp);
+  }
+
+  function createLayerVersionsResponse(versions) {
+    const resp = {};
+
+    resp.LayerVersions = versions.map(v => {
+      return {
+        Version: '' + v
+      }
     });
 
     return Promise.resolve(resp);
@@ -344,6 +372,113 @@ describe('Prune', function() {
     });
 
   });
+
+  describe('pruneLayers', function() {
+    const layerMatcher = (name) => sinon.match.has('LayerName', name);
+    const versionMatcher = (ver) => sinon.match.has('VersionNumber', ver);
+
+    it('should delete old versions of layers', function () {
+
+      const serverless = createMockServerlessWithLayers(['LayerA', 'LayerB'], { prune: { includeLayers: true } });
+      const plugin = new PrunePlugin(serverless, { number: 2 });
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', sinon.match.any)
+        .returns(createLayerVersionsResponse([1, 2, 3, 4, 5]));
+
+      return plugin.pruneLayers().then(() => {
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('1'));
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('2'));
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('3'));
+      });
+
+    });
+
+    it('should keep requested number of version', function () {
+
+      const serverless = createMockServerlessWithLayers(['LayerA'], {
+        prune: { automatic: true, number: 5, includeLayers: true },
+      });
+      const plugin = new PrunePlugin(serverless, { number: 3 });
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', sinon.match.any)
+        .returns(createLayerVersionsResponse([1, 2, 3, 4]));
+
+      return plugin.pruneLayers().then(() => {
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('1'));
+        sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('2'));
+        sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('3'));
+        sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', versionMatcher('4'));
+      });
+
+    });
+
+    it('should always match delete requests to correct layer', function () {
+
+      const serverless = createMockServerlessWithLayers(['LayerA', 'LayerB']);
+      const plugin = new PrunePlugin(serverless, { number: 1, includeLayers: true });
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', layerMatcher('layer-LayerA'))
+        .returns(createLayerVersionsResponse([1]));
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', layerMatcher('layer-LayerB'))
+        .returns(createLayerVersionsResponse([1, 2, 3]));
+
+      return plugin.pruneLayers().then(() => {
+        sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', layerMatcher('layer-LayerA'));
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', layerMatcher('layer-LayerB'));
+      });
+
+    });
+
+    it('should ignore layers that are not deployed', function () {
+
+      const serverless = createMockServerlessWithLayers(['LayerA', 'LayerB']);
+      const plugin = new PrunePlugin(serverless, { number: 1, includeLayers: true });
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', layerMatcher('layer-LayerA'))
+        .rejects({ statusCode: 404 });
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', layerMatcher('layer-LayerB'))
+        .returns(createLayerVersionsResponse([1, 2, 3]));
+
+      return plugin.pruneLayers().then(() => {
+        sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', layerMatcher('layer-LayerA'));
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', layerMatcher('layer-LayerB'));
+      });
+
+    });
+
+    it('should only operate on target layer if specified from CLI', function () {
+
+      const serverless = createMockServerlessWithLayers(['LayerA', 'LayerB', 'LayerC']);
+      const plugin = new PrunePlugin(serverless, { layer: 'LayerA', includeLayers: true, number: 1 });
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', sinon.match.any)
+        .returns(createLayerVersionsResponse([1, 2, 3, 4, 5]));
+
+      return plugin.pruneLayers().then(() => {
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', layerMatcher('layer-LayerA'));
+        sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', layerMatcher('layer-LayerB'));
+        sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteLayerVersion', layerMatcher('layer-LayerC'));
+      });
+
+    });
+
+    it('should not perform any layer deletions if dryRun flag is set', function () {
+
+      const serverless = createMockServerlessWithLayers(['LayerA', 'LayerB', 'LayerC']);
+      const plugin = new PrunePlugin(serverless, { number: 1, dryRun: true, includeLayers: true });
+      sinon.spy(plugin, 'deleteVersionsForLayer');
+
+      plugin.provider.request.withArgs('Lambda', 'listLayerVersions', sinon.match.any)
+        .returns(createLayerVersionsResponse([1, 2, 3, 4, 5]));
+
+      return plugin.prune().then(() => {
+        sinon.assert.notCalled(plugin.deleteVersionsForLayer);
+      });
+
+    });
+  })
 
   describe('postDeploy', function() {
 

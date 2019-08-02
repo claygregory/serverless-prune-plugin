@@ -12,7 +12,7 @@ class Prune {
 
     this.commands = {
       prune: {
-        usage: 'Clean up deployed functions by deleting older versions.',
+        usage: 'Clean up deployed functions and/or layers by deleting older versions.',
         lifecycleEvents: ['prune'],
         options: {
           number: {
@@ -31,6 +31,16 @@ class Prune {
           function: {
             usage: 'Function name. Limits cleanup to the specified function',
             shortcut: 'f',
+            required: false
+          },
+          layer: {
+            usage: 'Layer name. Limits cleanup to the specified Lambda layer',
+            shortcut: 'l',
+            required: false
+          },
+          includeLayers: {
+            usage: 'Boolean flag. Includes the pruning of Lambda layers.',
+            shortcut: 'i',
             required: false
           },
           dryRun: {
@@ -80,10 +90,53 @@ class Prune {
 
     if (this.pluginCustom.automatic && this.pluginCustom.number >= 1) {
       this.serverless.cli.log('Prune: Running post-deployment pruning');
+      
+      if(this.pluginCustom.includeLayers) {
+        return BbPromise.all([ 
+          this.prune(), 
+          this.pruneLayers() 
+        ]);
+      }
+
       return this.prune();
+
     } else {
       return BbPromise.resolve();
     }
+  }
+
+  pruneLayers() {
+
+    const selectedLayers = this.options.layer ? [this.options.layer] : this.serverless.service.getAllLayers();
+    const layerNames = selectedLayers.map(key => this.serverless.service.getLayer(key).name);
+
+    this.serverless.cli.log('Prune: Querying for deployed layer versions');
+
+    return BbPromise.mapSeries(layerNames, layerName => {
+
+      return BbPromise.join(
+        this.listVersionsForLayer(layerName),
+        (versions) => ({ name: layerName, versions: versions })
+      );
+
+    }).each(layerResult => {
+      if (!layerResult.versions.length)
+        return BbPromise.resolve();
+
+      const deletionVersions = this.selectPruneVersionsForLayer(layerResult.versions);
+
+      const puralized = (count, single, plural) => `${count} ${count != 1 ? plural : single}`;
+
+      const nonLatestVersionCount = layerResult.versions.length - 1;
+      this.serverless.cli.log(`Prune: Layer ${layerResult.name} has ${puralized(nonLatestVersionCount, 'additional version', 'additional versions')} published and ${puralized(deletionVersions.length, 'version', 'versions')} selected for deletion`);
+
+      if (this.options.dryRun) {
+        return BbPromise.resolve();
+      } else {
+        return this.deleteVersionsForLayer(layerResult.name, deletionVersions);
+      }
+    });
+
   }
 
   prune() {
@@ -91,7 +144,7 @@ class Prune {
     const selectedFunctions = this.options.function ? [this.options.function] : this.serverless.service.getAllFunctions();
     const functionNames = selectedFunctions.map(key => this.serverless.service.getFunction(key).name);
 
-    this.serverless.cli.log('Prune: Querying for deployed versions');
+    this.serverless.cli.log('Prune: Querying for deployed function versions');
 
     return BbPromise.mapSeries(functionNames, functionName => {
 
@@ -126,11 +179,29 @@ class Prune {
     });
   }
 
+  deleteVersionsForLayer(layerName, versions) {
+    return BbPromise.each(versions, version => {
+
+      this.serverless.cli.log(`Prune: Deleting Layer ${layerName} v${version}...`);
+
+      const params = {
+        LayerName: layerName,
+        VersionNumber: version
+      };
+
+      return BbPromise.resolve()
+        .then(() => this.provider.request('Lambda', 'deleteLayerVersion', params))
+        .catch(e => {
+          throw e;
+        });
+    });
+  }
+
   deleteVersionsForFunction(functionName, versions) {
     
     return BbPromise.each(versions, version => {
       
-      this.serverless.cli.log(`Prune: Deleting ${functionName} v${version}...`);
+      this.serverless.cli.log(`Prune: Deleting Function ${functionName} v${version}...`);
 
       const params = {
         FunctionName: functionName, 
@@ -173,6 +244,20 @@ class Prune {
       });
   }
 
+  listVersionsForLayer(layerName) {
+    const params = {
+      LayerName: layerName
+    };
+
+    return this.makeLambdaRequest('listLayerVersions', params, r => r.LayerVersions)
+      .catch(e => {
+        // ignore if layer not deployed
+        if (e.statusCode === 404) return [];
+        else throw e;
+      });
+    
+  }
+
   makeLambdaRequest(action, params, responseMapping) {
     
     const results = [];
@@ -201,6 +286,16 @@ class Prune {
       .map(f => f.Version)
       .filter(v => v !== '$LATEST') //skip $LATEST
       .filter(v => aliasedVersion.indexOf(v) === -1) //skip aliased versions
+      .sort((a, b) => parseInt(a) === parseInt(b) ? 0 : parseInt(a) > parseInt(b) ? -1 : 1)
+      .slice(this.getNumber());
+
+    return deletionCandidates;
+  }
+
+  selectPruneVersionsForLayer(versions) {
+    
+    const deletionCandidates = versions
+      .map(f => f.Version)
       .sort((a, b) => parseInt(a) === parseInt(b) ? 0 : parseInt(a) > parseInt(b) ? -1 : 1)
       .slice(this.getNumber());
 
