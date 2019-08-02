@@ -22,7 +22,7 @@ describe('Prune', function() {
       }
     );
 
-    return Object.assign(serverless, {...withLayers});
+    return Object.assign(serverless, withLayers);
   }
 
   function createMockServerless(functions, serviceCustom) {
@@ -73,7 +73,7 @@ describe('Prune', function() {
     resp.LayerVersions = versions.map(v => {
       return {
         Version: '' + v
-      }
+      };
     });
 
     return Promise.resolve(resp);
@@ -494,7 +494,7 @@ describe('Prune', function() {
       });
 
     });
-  })
+  });
 
   describe('postDeploy', function() {
 
@@ -536,7 +536,7 @@ describe('Prune', function() {
       return plugin.postDeploy().then(() => {
         sinon.assert.notCalled(plugin.pruneLayers);
       });
-    })
+    });
 
   });
 
