@@ -7,7 +7,7 @@ class Prune {
     this.serverless = serverless;
     this.options = options || {};
     this.provider = this.serverless.getProvider('aws');
-    this.debug = process.env.SLS_DEBUG === '*';
+    this.debug = process.env.SLS_DEBUG !== undefined;
 
     this.pluginCustom = this.loadCustom(this.serverless.service.custom);
 
