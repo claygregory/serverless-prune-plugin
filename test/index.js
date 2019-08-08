@@ -561,7 +561,6 @@ describe('Prune', function() {
         sinon.assert.notCalled(plugin.serverless.cli.log);
       });
     });
-
   });
 
 });
