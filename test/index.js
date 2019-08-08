@@ -524,4 +524,44 @@ describe('Prune', function() {
 
   });
 
+  describe('Logging', function() {
+
+    it('should log input when SLS_DEBUG = "*"', function() {
+      process.env.SLS_DEBUG = '*';
+
+      const serverlessStub = createMockServerless([], { 
+        prune: {
+          automatic: true,
+          number: 1
+        }
+      });
+
+      const plugin = new PrunePlugin(serverlessStub, {});
+      sinon.spy(plugin, 'log');
+
+      return plugin.postDeploy().then(() => {
+        sinon.assert.called(plugin.log);
+      });
+    });
+
+    it('should not log input when SLS_DEBUG is undefined', function () {
+      process.env.SLS_DEBUG = undefined;
+
+      const serverlessStub = createMockServerless([], {
+        prune: {
+          automatic: true,
+          number: 1
+        }
+      });
+
+      const plugin = new PrunePlugin(serverlessStub, {});
+      sinon.spy(plugin, 'log');
+
+      return plugin.postDeploy().then(() => {
+        sinon.assert.notCalled(plugin.serverless.cli.log);
+      });
+    });
+
+  });
+
 });
