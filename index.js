@@ -112,7 +112,7 @@ class Prune {
   pruneLayers() {
 
     const selectedLayers = this.options.layer ? [this.options.layer] : this.serverless.service.getAllLayers();
-    const layerNames = selectedLayers.map(key => this.serverless.service.getLayer(key).name);
+    const layerNames = selectedLayers.map(key => this.serverless.service.getLayer(key).name || key);
 
     this.serverless.cli.log('Prune: Querying for deployed layer versions');
 
