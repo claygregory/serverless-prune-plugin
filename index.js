@@ -230,7 +230,7 @@ class Prune {
     return this.makeLambdaRequest('listAliases', params, r => r.Aliases)
       .catch(e => {
         //ignore if function not deployed
-        if (e.statusCode === 404) return [];
+        if (e.statusCode === 404 || e.providerError.statusCode === 404) return [];
         else throw e;
       });
   }
@@ -243,7 +243,7 @@ class Prune {
     return this.makeLambdaRequest('listVersionsByFunction', params, r => r.Versions)
       .catch(e => {
         //ignore if function not deployed
-        if (e.statusCode === 404) return [];
+        if (e.statusCode === 404 || e.providerError.statusCode === 404) return [];
         else throw e;
       });
   }
@@ -256,7 +256,7 @@ class Prune {
     return this.makeLambdaRequest('listLayerVersions', params, r => r.LayerVersions)
       .catch(e => {
         // ignore if layer not deployed
-        if (e.statusCode === 404) return [];
+        if (e.statusCode === 404 || e.providerError.statusCode === 404) return [];
         else throw e;
       });
     
