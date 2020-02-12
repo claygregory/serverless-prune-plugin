@@ -188,7 +188,7 @@ describe('Prune', function() {
     it('should ignore failure while deleting lambda edge function', function(done) {
 
       plugin.provider.request.withArgs('Lambda', 'deleteFunction', sinon.match.any)
-        .rejects({ statusCode: 400, message: 'Lambda was unable to delete arn:aws:lambda:REGION:ACCOUNT_ID:function:FUNCTION_NAME:FUNCTION_VERSION because it is a replicated function. Please see our documentation for Deleting Lambda@Edge Functions and Replicas.' });
+        .rejects({ providerError: { statusCode: 400, message: 'Lambda was unable to delete arn:aws:lambda:REGION:ACCOUNT_ID:function:FUNCTION_NAME:FUNCTION_VERSION because it is a replicated function. Please see our documentation for Deleting Lambda@Edge Functions and Replicas.' }});
 
       plugin.deleteVersionsForFunction('MyEdgeFunction', [1])
         .then(() => done())
@@ -199,7 +199,7 @@ describe('Prune', function() {
     it('should fail when error while deleting regular lambda function', function(done) {
 
       plugin.provider.request.withArgs('Lambda', 'deleteFunction', sinon.match.any)
-        .rejects({ statusCode: 400, message: 'Some Error' });
+        .rejects({ providerError: { statusCode: 400, message: 'Some Error' }});
 
       plugin.deleteVersionsForFunction('MyFunction', [1])
         .then(() => done(new Error('should fail')))
@@ -317,10 +317,10 @@ describe('Prune', function() {
       const plugin = new PrunePlugin(serverless, { number: 1 });
       
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionA'))
-        .rejects({ statusCode: 404 });
+        .rejects({ providerError: { statusCode: 404 }});
 
       plugin.provider.request.withArgs('Lambda', 'listAliases', functionMatcher('service-FunctionA'))
-        .rejects({ statusCode: 404 });
+        .rejects({ providerError: { statusCode: 404 }});
 
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionB'))
         .returns(createVersionsResponse([1, 2, 3]));
@@ -436,7 +436,7 @@ describe('Prune', function() {
       const plugin = new PrunePlugin(serverless, { number: 1, includeLayers: true });
 
       plugin.provider.request.withArgs('Lambda', 'listLayerVersions', layerMatcher('layer-LayerA'))
-        .rejects({ statusCode: 404 });
+        .rejects({ providerError: { statusCode: 404 }});
 
       plugin.provider.request.withArgs('Lambda', 'listLayerVersions', layerMatcher('layer-LayerB'))
         .returns(createLayerVersionsResponse([1, 2, 3]));
