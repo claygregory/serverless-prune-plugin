@@ -87,10 +87,16 @@ See:
 sls prune --help
 ```
 
-## See Also
+## Common Questions
 
-The [Serverless Autoprune Plugin](https://github.com/arabold/serverless-autoprune-plugin) by [arabold](https://github.com/arabold) performs a similar role, but targets Serverless 0.5.x projects.
+**How do I set up different pruning configurations per region/stage?**
+
+Several suggestions are available in [this thread](https://github.com/claygregory/serverless-prune-plugin/issues/21#issuecomment-622651886).
+
+**Can I just disable versioning entirely?**
+
+Absolutely. While Serverless Framework has it enabled by default, [versioning can be disabled](https://www.serverless.com/framework/docs/providers/aws/guide/functions/#versioning-deployed-functions).
 
 ## License
 
-See the included [LICENSE](LICENSE.md) for rights and limitations under the terms of the MIT license.
+Copyright (c) 2017 [Clay Gregory](https://claygregory.com). See the included [LICENSE](LICENSE.md) for rights and limitations under the terms of the MIT license.
