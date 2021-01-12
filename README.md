@@ -87,6 +87,15 @@ See:
 sls prune --help
 ```
 
+## Permissions Reqired
+
+To run this plugin, the user will need to be allowed the following permissions in AWS:
+- `lambda:listAliases`
+- `lambda:listVersionsByFunction`
+- `lambda:deleteFunction`
+- `lambda:listLayerVersions`
+- `lambda:deleteLayerVersion`
+
 ## Common Questions
 
 **How do I set up different pruning configurations per region/stage?**
