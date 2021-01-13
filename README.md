@@ -87,7 +87,7 @@ See:
 sls prune --help
 ```
 
-## Permissions Reqired
+## Permissions Required
 
 To run this plugin, the user will need to be allowed the following permissions in AWS:
 - `lambda:listAliases`
