@@ -91,6 +91,7 @@ class Prune {
 
       if (typeof custom.prune.includeLayers === 'boolean') {
         pluginCustom.includeLayers = custom.prune.includeLayers;
+        pluginCustom.layerNames = custom.prune.layers;
       }
     }
 
@@ -141,7 +142,7 @@ class Prune {
 
   pruneLayers() {
     const selectedLayers = this.options.layer ? [this.options.layer] : this.serverless.service.getAllLayers();
-    const layerNames = selectedLayers.map(key => this.serverless.service.getLayer(key).name || key);
+    const layerNames = this.pluginCustom.layerNames || selectedLayers.map(key => this.serverless.service.getLayer(key).name || key);
 
     this.createProgress(
       'prune-plugin-prune-layers',
