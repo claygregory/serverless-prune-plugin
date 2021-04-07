@@ -18,35 +18,42 @@ class Prune {
           number: {
             usage: 'Number of previous versions to keep',
             shortcut: 'n',
-            required: true
+            required: true,
+            type: 'string'
           },
           stage: {
             usage: 'Stage of the service',
             shortcut: 's',
+            type: 'string'
           },
           region: {
             usage: 'Region of the service',
             shortcut: 'r',
+            type: 'string'
           },
           function: {
             usage: 'Function name. Limits cleanup to the specified function',
             shortcut: 'f',
-            required: false
+            required: false,
+            type: 'string'
           },
           layer: {
             usage: 'Layer name. Limits cleanup to the specified Lambda layer',
             shortcut: 'l',
-            required: false
+            required: false,
+            type: 'string'
           },
           includeLayers: {
             usage: 'Boolean flag. Includes the pruning of Lambda layers.',
             shortcut: 'i',
-            required: false
+            required: false,
+            type: 'boolean'
           },
           dryRun: {
             usage: 'Dry-run. Lists deletion candidates',
             shortcut: 'd',
-            required: false
+            required: false,
+            type: 'boolean'
           }
         }
       },
