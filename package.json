@@ -30,5 +30,8 @@
     "mocha": "^4.0.0",
     "mocha-lcov-reporter": "^1.2.0",
     "sinon": "^4.0.1"
+  },
+  "peerDependencies": {
+    "serverless": "1 || 2"
   }
 }
