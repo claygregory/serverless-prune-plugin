@@ -482,7 +482,7 @@ describe('Prune', function() {
 
   describe('postDeploy', function() {
 
-    it('should prune functions if automatic is option is configured', function() {
+    it('should prune functions if automatic option is configured', function() {
 
       const custom = {
         prune: { automatic: true, number: 10 }
@@ -496,6 +496,36 @@ describe('Prune', function() {
         sinon.assert.calledOnce(plugin.prune);
       });
     });
+
+    it('should prune all functions if automatic option is configured and number is 0', function() {
+
+      const custom = {
+        prune: { automatic: true, number: 0 }
+      };
+      const serverlessStub = createMockServerless([], custom);
+
+      const plugin = new PrunePlugin(serverlessStub, {});
+      sinon.spy(plugin, 'prune');
+
+      return plugin.postDeploy().then(() => {
+        sinon.assert.calledOnce(plugin.prune);
+      });
+    });    
+
+    it('should not prune functions if automatic option is configured without a number', function() {
+
+      const custom = {
+        prune: { automatic: true }
+      };
+      const serverlessStub = createMockServerless([], custom);
+
+      const plugin = new PrunePlugin(serverlessStub, {});
+      sinon.spy(plugin, 'prune');
+
+      return plugin.postDeploy().then(() => {
+        sinon.assert.notCalled(plugin.prune);
+      });
+    });    
 
     it('should not prune functions if noDeploy flag is set', function() {
 
