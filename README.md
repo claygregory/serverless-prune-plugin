@@ -60,6 +60,7 @@ custom:
 ```
 
 To run automatically, the `automatic` property of `prune` must be set to `true` and the `number` of versions to keep must be specified.
+It is possible to set `number` to `0`. In this case, the plugin will delete all the function versions (except $LATEST); this is useful when disabling function versioning for an already-deployed stack.
 
 ### Layers
 

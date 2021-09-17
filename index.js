@@ -99,7 +99,8 @@ class Prune {
       return BbPromise.resolve();
     }
 
-    if (this.pluginCustom.automatic && this.pluginCustom.number >= 1) {
+    if (this.pluginCustom.automatic && 
+      this.pluginCustom.number !== undefined && this.pluginCustom.number >= 0) {
       this.serverless.cli.log('Prune: Running post-deployment pruning');
       
       if(this.pluginCustom.includeLayers) {
