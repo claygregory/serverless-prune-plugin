@@ -224,7 +224,7 @@ class Prune {
         .then(() => this.provider.request('Lambda', 'deleteFunction', params))
         .catch(e => {
           //ignore if trying to delete replicated lambda edge function
-          if (e.providerError.statusCode === 400 && e.providerError.message.startsWith('Lambda was unable to delete') && e.providerError.message.indexOf('because it is a replicated function.') > -1) this.serverless.cli.log(`Prune: Unable to delete replicated edge function ${functionName} v${version}...`);
+          if (e.providerError && e.providerError.statusCode === 400 && e.providerError.message.startsWith('Lambda was unable to delete') && e.providerError.message.indexOf('because it is a replicated function.') > -1) this.serverless.cli.log(`Prune: Unable to delete replicated edge function ${functionName} v${version}...`);
           else throw e;
         });
     });
@@ -238,7 +238,7 @@ class Prune {
     return this.makeLambdaRequest('listAliases', params, r => r.Aliases)
       .catch(e => {
         //ignore if function not deployed
-        if (e.providerError.statusCode === 404) return [];
+        if (e.providerError && e.providerError.statusCode === 404) return [];
         else throw e;
       });
   }
@@ -251,7 +251,7 @@ class Prune {
     return this.makeLambdaRequest('listVersionsByFunction', params, r => r.Versions)
       .catch(e => {
         //ignore if function not deployed
-        if (e.providerError.statusCode === 404) return [];
+        if (e.providerError && e.providerError.statusCode === 404) return [];
         else throw e;
       });
   }
@@ -264,7 +264,7 @@ class Prune {
     return this.makeLambdaRequest('listLayerVersions', params, r => r.LayerVersions)
       .catch(e => {
         // ignore if layer not deployed
-        if (e.providerError.statusCode === 404) return [];
+        if (e.providerError && e.providerError.statusCode === 404) return [];
         else throw e;
       });
     
