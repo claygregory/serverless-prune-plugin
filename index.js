@@ -3,10 +3,12 @@
 const BbPromise = require('bluebird');
 
 class Prune {
-  constructor(serverless, options) {
+  constructor(serverless, options, { log, progress } = {}) {
     this.serverless = serverless;
     this.options = options || {};
     this.provider = this.serverless.getProvider('aws');
+    this.log = log || serverless.cli.log;
+    this.progress = progress;
 
     this.pluginCustom = this.loadCustom(this.serverless.service.custom);
 
@@ -50,8 +52,13 @@ class Prune {
             type: 'boolean'
           },
           dryRun: {
-            usage: 'Dry-run. Lists deletion candidates',
+            usage: 'Simulate pruning without executing delete actions. Deletion candidates are logged when used in conjunction with --verbose',
             shortcut: 'd',
+            required: false,
+            type: 'boolean'
+          },
+          verbose: {
+            usage: 'Enable detailed output during plugin execution',
             required: false,
             type: 'boolean'
           }
@@ -60,10 +67,9 @@ class Prune {
     };
 
     this.hooks = {
-      'prune:prune': this.prune.bind(this),
+      'prune:prune': this.cliPrune.bind(this),
       'after:deploy:deploy': this.postDeploy.bind(this)
     };
-
   }
 
   getNumber() {
@@ -79,17 +85,35 @@ class Prune {
         if (!isNaN(number)) pluginCustom.number = number;
       }
 
-      if (custom.prune.automatic != null && typeof custom.prune.automatic === 'boolean') {
+      if (typeof custom.prune.automatic === 'boolean') {
         pluginCustom.automatic = custom.prune.automatic;
       }
 
-      if (custom.prune.includeLayers != null && typeof custom.prune.includeLayers === 'boolean') {
+      if (typeof custom.prune.includeLayers === 'boolean') {
         pluginCustom.includeLayers = custom.prune.includeLayers;
       }
-
     }
 
     return pluginCustom;
+  }
+
+  cliPrune() {
+    if (this.options.dryRun) {
+      this.logNotice('Dry-run enabled, no pruning actions will be performed.');
+    }
+
+    if(this.options.includeLayers) {
+      return BbPromise.all([
+        this.pruneFunctions(),
+        this.pruneLayers()
+      ]);
+    }
+
+    if (this.options.layer && !this.options.function) {
+      return this.pruneLayers();
+    } else {
+      return this.pruneFunctions();
+    }
   }
 
   postDeploy() {
@@ -99,30 +123,30 @@ class Prune {
       return BbPromise.resolve();
     }
 
-    if (this.pluginCustom.automatic && 
+    if (this.pluginCustom.automatic &&
       this.pluginCustom.number !== undefined && this.pluginCustom.number >= 0) {
-      this.serverless.cli.log('Prune: Running post-deployment pruning');
-      
+
       if(this.pluginCustom.includeLayers) {
-        return BbPromise.all([ 
-          this.prune(), 
-          this.pruneLayers() 
+        return BbPromise.all([
+          this.pruneFunctions(),
+          this.pruneLayers()
         ]);
       }
 
-      return this.prune();
-
+      return this.pruneFunctions();
     } else {
       return BbPromise.resolve();
     }
   }
 
   pruneLayers() {
-
     const selectedLayers = this.options.layer ? [this.options.layer] : this.serverless.service.getAllLayers();
     const layerNames = selectedLayers.map(key => this.serverless.service.getLayer(key).name || key);
 
-    this.serverless.cli.log('Prune: Querying for deployed layer versions');
+    this.createProgress(
+      'prune-plugin-prune-layers',
+      'Pruning layer versions'
+    );
 
     return BbPromise.mapSeries(layerNames, layerName => {
 
@@ -131,32 +155,36 @@ class Prune {
         (versions) => ({ name: layerName, versions: versions })
       );
 
-    }).each(layerResult => {
-      if (!layerResult.versions.length)
+    }).each(({ name, versions }) => {
+      if (!versions.length) {
         return BbPromise.resolve();
+      }
 
-      const deletionVersions = this.selectPruneVersionsForLayer(layerResult.versions);
-
-      const puralized = (count, single, plural) => `${count} ${count != 1 ? plural : single}`;
-
-      const nonLatestVersionCount = layerResult.versions.length - 1;
-      this.serverless.cli.log(`Prune: Layer ${layerResult.name} has ${puralized(nonLatestVersionCount, 'additional version', 'additional versions')} published and ${puralized(deletionVersions.length, 'version', 'versions')} selected for deletion`);
+      const deletionCandidates = this.selectPruneVersionsForLayer(versions);
+      if (deletionCandidates.length > 0) {
+        this.updateProgress('prune-plugin-prune-layers', `Pruning layer versions (${name})`);
+      }
 
       if (this.options.dryRun) {
+        this.printPruningCandidates(name, deletionCandidates);
         return BbPromise.resolve();
       } else {
-        return this.deleteVersionsForLayer(layerResult.name, deletionVersions);
+        return this.deleteVersionsForLayer(name, deletionCandidates);
       }
+    }).then(() => {
+      this.clearProgress('prune-plugin-prune-layers');
+      this.logSuccess('Pruning of layers complete');
     });
-
   }
 
-  prune() {
-
+  pruneFunctions() {
     const selectedFunctions = this.options.function ? [this.options.function] : this.serverless.service.getAllFunctions();
     const functionNames = selectedFunctions.map(key => this.serverless.service.getFunction(key).name);
 
-    this.serverless.cli.log('Prune: Querying for deployed function versions');
+    this.createProgress(
+      'prune-plugin-prune-functions',
+      'Pruning function versions'
+    );
 
     return BbPromise.mapSeries(functionNames, functionName => {
 
@@ -166,35 +194,31 @@ class Prune {
         (versions, aliases) => ( { name: functionName, versions: versions, aliases: aliases } )
       );
 
-    }).each(functionResult => {
-
-      if (!functionResult.versions.length)
+    }).each(({ name, versions, aliases }) => {
+      if (!versions.length) {
         return BbPromise.resolve();
-
-      const deletionVersions = this.selectPruneVersionsForFunction(functionResult.versions, functionResult.aliases);
-
-      const puralized = (count, single, plural) => `${count} ${count != 1 ? plural : single}`;
-
-      const nonLatestVersionCount = functionResult.versions.length - 1;
-      const aliasCount = functionResult.aliases.length;
-      this.serverless.cli.log(`Prune: ${functionResult.name} has ${puralized(nonLatestVersionCount, 'additional version', 'additional versions')} published and ${puralized(aliasCount, 'alias', 'aliases')}, ${puralized(deletionVersions.length, 'version', 'versions')} selected for deletion`);
-  
-      if (this.options.dryRun) {
-        return BbPromise.resolve();
-      } else {
-        return this.deleteVersionsForFunction(functionResult.name, deletionVersions);
       }
 
+      const deletionCandidates = this.selectPruneVersionsForFunction(versions, aliases);
+      if (deletionCandidates.length > 0) {
+        this.updateProgress('prune-plugin-prune-functions', `Pruning function versions (${name})`);
+      }
+
+      if (this.options.dryRun) {
+        this.printPruningCandidates(name, deletionCandidates);
+        return BbPromise.resolve();
+      } else {
+        return this.deleteVersionsForFunction(name, deletionCandidates);
+      }
     }).then(() => {
-      const actions = this.options.dryRun ? 'Dry-run complete, no actions taken.' : 'Pruning complete.';
-      this.serverless.cli.log('Prune: ' + actions);
+      this.clearProgress('prune-plugin-prune-functions');
+      this.logSuccess('Pruning of functions complete');
     });
   }
 
   deleteVersionsForLayer(layerName, versions) {
     return BbPromise.each(versions, version => {
-
-      this.serverless.cli.log(`Prune: Deleting Layer ${layerName} v${version}...`);
+      this.logInfo(`Deleting layer version ${layerName}:${version}.`);
 
       const params = {
         LayerName: layerName,
@@ -210,22 +234,25 @@ class Prune {
   }
 
   deleteVersionsForFunction(functionName, versions) {
-    
     return BbPromise.each(versions, version => {
-      
-      this.serverless.cli.log(`Prune: Deleting Function ${functionName} v${version}...`);
+      this.logInfo(`Deleting function version ${functionName}:${version}.`);
 
       const params = {
-        FunctionName: functionName, 
+        FunctionName: functionName,
         Qualifier: version
       };
-      
+
       return BbPromise.resolve()
         .then(() => this.provider.request('Lambda', 'deleteFunction', params))
         .catch(e => {
           //ignore if trying to delete replicated lambda edge function
-          if (e.providerError && e.providerError.statusCode === 400 && e.providerError.message.startsWith('Lambda was unable to delete') && e.providerError.message.indexOf('because it is a replicated function.') > -1) this.serverless.cli.log(`Prune: Unable to delete replicated edge function ${functionName} v${version}...`);
-          else throw e;
+          if (e.providerError && e.providerError.statusCode === 400
+            && e.providerError.message.startsWith('Lambda was unable to delete')
+            && e.providerError.message.indexOf('because it is a replicated function.') > -1) {
+            this.logWarning(`Unable to delete replicated Lambda@Edge function version ${functionName}:${version}.`);
+          } else {
+            throw e;
+          }
         });
     });
   }
@@ -267,20 +294,17 @@ class Prune {
         if (e.providerError && e.providerError.statusCode === 404) return [];
         else throw e;
       });
-    
+
   }
 
   makeLambdaRequest(action, params, responseMapping) {
-    
     const results = [];
     const responseHandler = response => {
-
       Array.prototype.push.apply(results, responseMapping(response));
 
       if (response.NextMarker) {
         return this.provider.request('Lambda', action, Object.assign({}, params, { Marker: response.NextMarker }))
           .then(responseHandler);
-
       } else {
         return BbPromise.resolve(results);
       }
@@ -291,29 +315,73 @@ class Prune {
   }
 
   selectPruneVersionsForFunction(versions, aliases) {
-
     const aliasedVersion = aliases.map(a => a.FunctionVersion);
 
-    const deletionCandidates = versions
+    return versions
       .map(f => f.Version)
       .filter(v => v !== '$LATEST') //skip $LATEST
       .filter(v => aliasedVersion.indexOf(v) === -1) //skip aliased versions
       .sort((a, b) => parseInt(a) === parseInt(b) ? 0 : parseInt(a) > parseInt(b) ? -1 : 1)
       .slice(this.getNumber());
-
-    return deletionCandidates;
   }
 
   selectPruneVersionsForLayer(versions) {
-    
-    const deletionCandidates = versions
+    return versions
       .map(f => f.Version)
       .sort((a, b) => parseInt(a) === parseInt(b) ? 0 : parseInt(a) > parseInt(b) ? -1 : 1)
       .slice(this.getNumber());
-
-    return deletionCandidates;
   }
 
+  printPruningCandidates(name, deletionCandidates) {
+    deletionCandidates.forEach(version => this.logInfo(`${name}:${version} selected for deletion.`));
+  }
+
+  // -- Compatibility with both Framework 2.x and 3.x logging ---
+
+  logInfo(message) {
+    if (this.log.info) this.log.info(message);
+    else this.log(`Prune: ${message}`);
+  }
+
+  logNotice(message) {
+    if (this.log.notice) this.log.notice(message);
+    else this.log(`Prune: ${message}`);
+  }
+
+  logWarning(message) {
+    if (this.log.warning) this.log.warning(message);
+    else this.log(`Prune: ${message}`);
+  }
+
+  logSuccess(message) {
+    if (this.log.success) this.log.success(message);
+    else this.log(`Prune: ${message}`);
+  }
+
+  createProgress(name, message) {
+    if (!this.progress) {
+      this.log(`Prune: ${message}...`);
+    } else {
+      this.progress.create({
+        message,
+        name
+      });
+    }
+  }
+
+  updateProgress(name, message) {
+    if (!this.progress) {
+      this.log(`Prune: ${message}`);
+    } else {
+      this.progress.get(name).update(message);
+    }
+  }
+
+  clearProgress(name) {
+    if (this.progress) {
+      this.progress.get(name).remove();
+    }
+  }
 }
 
 module.exports = Prune;

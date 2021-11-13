@@ -14,9 +14,9 @@ describe('Prune', function() {
     const { service } = serverless;
 
     const withLayers = Object.assign(
-      serverless.service, 
-      service, 
-      { 
+      serverless.service,
+      service,
+      {
         getAllLayers: () => layers,
         getLayer: (key) => { return { name: `layer-${key}` }; },
       }
@@ -84,7 +84,7 @@ describe('Prune', function() {
     it('should assign correct properties', function() {
 
       const serverlessStub = createMockServerless([], null);
-      
+
       const provider = { aws: 'provider' };
       const options = { option: 'a' };
       serverlessStub.getProvider.withArgs('aws').returns(provider);
@@ -154,7 +154,7 @@ describe('Prune', function() {
 
     it('should request deletions for each provided version of function', function() {
       const versionMatcher = (ver) => sinon.match({
-        FunctionName: 'MyFunction', 
+        FunctionName: 'MyFunction',
         Qualifier: ver
       });
 
@@ -176,7 +176,7 @@ describe('Prune', function() {
     });
   });
 
-  describe('deleteVersionsForFunction - lambda edge', function() {
+  describe('deleteVersionsForFunction - Lambda@Edge', function() {
 
     let serverless;
     let plugin;
@@ -185,7 +185,7 @@ describe('Prune', function() {
       plugin = new PrunePlugin(serverless, {});
     });
 
-    it('should ignore failure while deleting lambda edge function', function(done) {
+    it('should ignore failure while deleting Lambda@Edge function', function(done) {
 
       plugin.provider.request.withArgs('Lambda', 'deleteFunction', sinon.match.any)
         .rejects({ providerError: { statusCode: 400, message: 'Lambda was unable to delete arn:aws:lambda:REGION:ACCOUNT_ID:function:FUNCTION_NAME:FUNCTION_VERSION because it is a replicated function. Please see our documentation for Deleting Lambda@Edge Functions and Replicas.' }});
@@ -208,7 +208,7 @@ describe('Prune', function() {
     });
   });
 
-  describe('prune', function() {
+  describe('pruneFunctions', function() {
 
     const functionMatcher = (name) => sinon.match.has('FunctionName', name);
     const versionMatcher = (ver) => sinon.match.has('Qualifier', ver);
@@ -217,14 +217,14 @@ describe('Prune', function() {
 
       const serverless = createMockServerless(['FunctionA', 'FunctionB']);
       const plugin = new PrunePlugin(serverless, { number: 2 });
-      
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
         .returns(createVersionsResponse([1, 2, 3, 4, 5]));
 
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneFunctions().then(() => {
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('1'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('2'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('3'));
@@ -238,14 +238,14 @@ describe('Prune', function() {
         prune: { automatic: true, number: 5 }
       });
       const plugin = new PrunePlugin(serverless, { number: 3 });
-      
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
         .returns(createVersionsResponse([1, 2, 3, 4]));
 
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneFunctions().then(() => {
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('1'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('2'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('3'));
@@ -258,14 +258,14 @@ describe('Prune', function() {
 
       const serverless = createMockServerless(['FunctionA']);
       const plugin = new PrunePlugin(serverless, { number: 2 });
-      
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
         .returns(createVersionsResponse([1, 2, 3, 4, 5]));
 
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([1, 3]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneFunctions().then(() => {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('$LATEST'));
       });
 
@@ -275,14 +275,14 @@ describe('Prune', function() {
 
       const serverless = createMockServerless(['FunctionA']);
       const plugin = new PrunePlugin(serverless, { number: 2 });
-      
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
         .returns(createVersionsResponse([1, 2, 3, 4, 5]));
 
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([1, 3, 4]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneFunctions().then(() => {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('1'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('3'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', versionMatcher('5'));
@@ -294,7 +294,7 @@ describe('Prune', function() {
 
       const serverless = createMockServerless(['FunctionA', 'FunctionB']);
       const plugin = new PrunePlugin(serverless, { number: 2 });
-      
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionA'))
         .returns(createVersionsResponse([1]));
 
@@ -304,7 +304,7 @@ describe('Prune', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneFunctions().then(() => {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionA'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionB'));
       });
@@ -315,7 +315,7 @@ describe('Prune', function() {
 
       const serverless = createMockServerless(['FunctionA', 'FunctionB']);
       const plugin = new PrunePlugin(serverless, { number: 1 });
-      
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionA'))
         .rejects({ providerError: { statusCode: 404 }});
 
@@ -328,7 +328,7 @@ describe('Prune', function() {
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneFunctions().then(() => {
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionA'));
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionB'));
       });
@@ -339,14 +339,14 @@ describe('Prune', function() {
 
       const serverless = createMockServerless(['FunctionA', 'FunctionB', 'FunctionC']);
       const plugin = new PrunePlugin(serverless, { function: 'FunctionA', number: 1 });
-      
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
         .returns(createVersionsResponse([1, 2, 3, 4, 5]));
 
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneFunctions().then(() => {
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionA'));
         sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionB'));
       });
@@ -358,14 +358,14 @@ describe('Prune', function() {
       const serverless = createMockServerless(['FunctionA', 'FunctionB', 'FunctionC']);
       const plugin = new PrunePlugin(serverless, {  number: 1, dryRun: true });
       sinon.spy(plugin, 'deleteVersionsForFunction');
-      
+
       plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
         .returns(createVersionsResponse([1, 2, 3, 4, 5]));
 
       plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
         .returns(createAliasResponse([]));
 
-      return plugin.prune().then(() => {
+      return plugin.pruneFunctions().then(() => {
         sinon.assert.notCalled(plugin.deleteVersionsForFunction);
       });
 
@@ -490,10 +490,10 @@ describe('Prune', function() {
       const serverlessStub = createMockServerless([], custom);
 
       const plugin = new PrunePlugin(serverlessStub, {});
-      sinon.spy(plugin, 'prune');
+      sinon.spy(plugin, 'pruneFunctions');
 
       return plugin.postDeploy().then(() => {
-        sinon.assert.calledOnce(plugin.prune);
+        sinon.assert.calledOnce(plugin.pruneFunctions);
       });
     });
 
@@ -505,12 +505,12 @@ describe('Prune', function() {
       const serverlessStub = createMockServerless([], custom);
 
       const plugin = new PrunePlugin(serverlessStub, {});
-      sinon.spy(plugin, 'prune');
+      sinon.spy(plugin, 'pruneFunctions');
 
       return plugin.postDeploy().then(() => {
-        sinon.assert.calledOnce(plugin.prune);
+        sinon.assert.calledOnce(plugin.pruneFunctions);
       });
-    });    
+    });
 
     it('should not prune functions if automatic option is configured without a number', function() {
 
@@ -520,12 +520,12 @@ describe('Prune', function() {
       const serverlessStub = createMockServerless([], custom);
 
       const plugin = new PrunePlugin(serverlessStub, {});
-      sinon.spy(plugin, 'prune');
+      sinon.spy(plugin, 'pruneFunctions');
 
       return plugin.postDeploy().then(() => {
-        sinon.assert.notCalled(plugin.prune);
+        sinon.assert.notCalled(plugin.pruneFunctions);
       });
-    });    
+    });
 
     it('should not prune functions if noDeploy flag is set', function() {
 
@@ -533,10 +533,10 @@ describe('Prune', function() {
 
       const options = { noDeploy: true };
       const plugin = new PrunePlugin(serverlessStub, options);
-      sinon.spy(plugin, 'prune');
+      sinon.spy(plugin, 'pruneFunctions');
 
       return plugin.postDeploy().then(() => {
-        sinon.assert.notCalled(plugin.prune);
+        sinon.assert.notCalled(plugin.pruneFunctions);
       });
     });
 
@@ -550,6 +550,87 @@ describe('Prune', function() {
       return plugin.postDeploy().then(() => {
         sinon.assert.notCalled(plugin.pruneLayers);
       });
+    });
+
+  });
+
+  describe('cliPrune', function() {
+
+    it('should only prune functions if no additional options are provided', function() {
+      const serverlessStub = createMockServerless([], null);
+
+      const plugin = new PrunePlugin(serverlessStub, {});
+      sinon.spy(plugin, 'pruneFunctions');
+      sinon.spy(plugin, 'pruneLayers');
+
+      return plugin.cliPrune().then(() => {
+        sinon.assert.calledOnce(plugin.pruneFunctions);
+        sinon.assert.notCalled(plugin.pruneLayers);
+      });
+    });
+
+    it('should prune functions and layers if includeLayers flag is provided', function() {
+      const serverlessStub = createMockServerlessWithLayers([], null);
+
+      const plugin = new PrunePlugin(serverlessStub, { includeLayers: true });
+      sinon.spy(plugin, 'pruneFunctions');
+      sinon.spy(plugin, 'pruneLayers');
+
+      return plugin.cliPrune().then(() => {
+        sinon.assert.calledOnce(plugin.pruneFunctions);
+        sinon.assert.calledOnce(plugin.pruneLayers);
+      });
+    });
+
+  });
+
+  describe('logInfo', function() {
+
+    it('should call the Serverless 3.x logging API if available', function() {
+      const serverlessStub = createMockServerless([], null);
+
+      const log = {
+        info: sinon.stub()
+      };
+      const plugin = new PrunePlugin(serverlessStub, {}, { log });
+
+      const msg = 'verbose message';
+      plugin.logInfo(msg);
+      sinon.assert.calledWith(log.info, msg);
+    });
+
+  });
+
+  describe('logWarning', function() {
+
+    it('should call the Serverless 3.x logging API if available', function() {
+      const serverlessStub = createMockServerless([], null);
+
+      const log = {
+        warning: sinon.stub()
+      };
+      const plugin = new PrunePlugin(serverlessStub, {}, { log });
+
+      const msg = 'warn message';
+      plugin.logWarning(msg);
+      sinon.assert.calledWith(log.warning, msg);
+    });
+
+  });
+
+  describe('logSuccess', function() {
+
+    it('should call the Serverless 3.x logging API if available', function() {
+      const serverlessStub = createMockServerless([], null);
+
+      const log = {
+        success: sinon.stub()
+      };
+      const plugin = new PrunePlugin(serverlessStub, {}, { log });
+
+      const msg = 'success message';
+      plugin.logSuccess(msg);
+      sinon.assert.calledWith(log.success, msg);
     });
 
   });
