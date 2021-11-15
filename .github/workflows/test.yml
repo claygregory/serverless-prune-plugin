@@ -27,7 +27,7 @@ jobs:
     - name: Run tests
       run: |
         npm ci
-        npm cover
+        npm run cover
 
     - name: Publish to Coveralls
       uses: coverallsapp/github-action@master
