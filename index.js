@@ -7,7 +7,7 @@ class Prune {
     this.serverless = serverless;
     this.options = options || {};
     this.provider = this.serverless.getProvider('aws');
-    this.log = log || serverless.cli.log;
+    this.log = log || serverless.cli.log.bind(serverless.cli);
     this.progress = progress;
 
     this.pluginCustom = this.loadCustom(this.serverless.service.custom);
