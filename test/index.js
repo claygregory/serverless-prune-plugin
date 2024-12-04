@@ -25,16 +25,22 @@ describe('Prune', function() {
     return Object.assign(serverless, withLayers);
   }
 
-  function createMockServerless(functions, serviceCustom) {
+  function createMockServerless(functions, serviceCustom, versionFunctions) {
+    let functionObjects = (functions || []).map(key => typeof key === 'object' ? Object.assign({}, key, {name: `service-${key.name}`}) : ({ name: `service-${key}`}));
     const serverless = {
       getProvider: sinon.stub(),
       cli: { log: sinon.stub() },
       service: {
-        getAllFunctions: () => functions,
-        getFunction: (key) => { return { name:`service-${key}` }; },
+        provider: { versionFunctions: true },
+        functions: functionObjects,
+        getAllFunctions: () => functions.map(f => typeof f === 'string' ? f : f.name),
+        getFunction: (key) => functionObjects.find(f => f.name === `service-${key}`) || {name: `service-${key}`},
         custom: serviceCustom
       }
     };
+    if (versionFunctions !== undefined) {
+      serverless.service.provider.versionFunctions = versionFunctions;
+    }
     const provider = { request: sinon.stub() };
     serverless.getProvider.withArgs('aws').returns(provider);
 
@@ -333,6 +339,23 @@ describe('Prune', function() {
         sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'deleteFunction', functionMatcher('service-FunctionB'));
       });
 
+    });
+
+    it('should ignore functions that have no provisioned concurrency when versioning is turned off on service', function() {
+
+      const serverless = createMockServerless([{name: 'FunctionA'}, {name: 'FunctionB', provisionedConcurrency: 1}], null, false);
+      const plugin = new PrunePlugin(serverless, { number: 1 });
+
+      plugin.provider.request.withArgs('Lambda', 'listVersionsByFunction', sinon.match.any)
+        .returns(createVersionsResponse([1, 2, 3, 4, 5]));
+
+      plugin.provider.request.withArgs('Lambda', 'listAliases', sinon.match.any)
+        .returns(createAliasResponse([]));
+
+      return plugin.pruneFunctions().then(() => {
+        sinon.assert.neverCalledWith(plugin.provider.request, 'Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionA'));
+        sinon.assert.calledWith(plugin.provider.request, 'Lambda', 'listVersionsByFunction', functionMatcher('service-FunctionB'));
+      });
     });
 
     it('should only operate on target function if specified from CLI', function() {

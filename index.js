@@ -178,7 +178,8 @@ class Prune {
   }
 
   pruneFunctions() {
-    const selectedFunctions = this.options.function ? [this.options.function] : this.serverless.service.getAllFunctions();
+    const selectedFunctions = this.options.function ? [this.options.function] :
+      (this.serverless.service.provider.versionFunctions === false ? this.serverless.service.getAllFunctions().filter(key => this.serverless.service.getFunction(key).provisionedConcurrency) : this.serverless.service.getAllFunctions());
     const functionNames = selectedFunctions.map(key => this.serverless.service.getFunction(key).name);
 
     this.createProgress(
