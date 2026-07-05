@@ -21,7 +21,7 @@
     "coveralls": "npm run cover -- --report lcovonly && cat ./coverage/lcov.info | coveralls"
   },
   "dependencies": {
-    "bluebird": "^3.7.2"
+    "@aws-sdk/client-lambda": "^3.1079.0"
   },
   "devDependencies": {
     "coveralls": "^3.1.1",

@@ -1,6 +1,68 @@
 'use strict';
 
-const BbPromise = require('bluebird');
+const { LambdaClient } = require('@aws-sdk/client-lambda');
+
+/**
+ * Run an async mapper over `items` with a bounded concurrency limit.
+ * Preserves input order in the resolved array. Native Promise only —
+ * keeps AWS Lambda API call rate within safe limits while still pruning
+ * many versions in parallel instead of one-at-a-time.
+ */
+async function pMap(items, mapper, concurrency = 5) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  const workers = new Array(workerCount).fill(0).map(async () => {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * Accept a "deployment skipped" flag regardless of whether it arrives as a
+ * boolean (option typed by the framework) or as a string from the CLI.
+ */
+function isTruthyFlag(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+/**
+ * Invoke a Lambda AWS API method in a framework-aware way.
+ * osls v4 removed provider.request() (throws AWS_SDK_V2_SURFACE_REMOVED);
+ * there a LambdaClient is built from provider.getAwsSdkV3Config() and the
+ * matching <Method>Command is sent. On serverless v3 the original
+ * provider.request() surface is kept as-is. LambdaClients are cached per
+ * provider via a WeakMap.
+ */
+const lambdaClientPromises = new WeakMap();
+function lambdaRequest(provider, action, params) {
+  if (typeof provider.getAwsSdkV3Config !== 'function') {
+    return provider.request('Lambda', action, params);
+  }
+  let clientPromise = lambdaClientPromises.get(provider);
+  if (!clientPromise) {
+    clientPromise = provider.getAwsSdkV3Config().then((cfg) => new LambdaClient(cfg));
+    lambdaClientPromises.set(provider, clientPromise);
+  }
+  return clientPromise.then((client) => {
+    // AWS SDK v3 Command classes are PascalCase (e.g. ListVersionsByFunctionCommand),
+    // while the v2 provider.request() action names are camelCase (e.g. listVersionsByFunction).
+    const commandName = action.charAt(0).toUpperCase() + action.slice(1) + 'Command';
+    const Command = require('@aws-sdk/client-lambda')[commandName];
+    if (typeof Command !== 'function') {
+      throw new Error(
+        `Unsupported Lambda action: ${action} (@aws-sdk/client-lambda does not export ${commandName})`
+      );
+    }
+    return client.send(new Command(params));
+  });
+}
 
 class Prune {
   constructor(serverless, options, { log, progress } = {}) {
@@ -103,7 +165,7 @@ class Prune {
     }
 
     if(this.options.includeLayers) {
-      return BbPromise.all([
+      return Promise.all([
         this.pruneFunctions(),
         this.pruneLayers()
       ]);
@@ -119,15 +181,17 @@ class Prune {
   postDeploy() {
     this.pluginCustom = this.loadCustom(this.serverless.service.custom);
 
-    if (this.options.noDeploy === true) {
-      return BbPromise.resolve();
+    if (isTruthyFlag(this.options.noDeploy)) {
+      // Deployment was skipped — do not prune.
+      this.logNotice('Deployment skipped (noDeploy). Skipping prune.');
+      return Promise.resolve();
     }
 
     if (this.pluginCustom.automatic &&
       this.pluginCustom.number !== undefined && this.pluginCustom.number >= 0) {
 
       if(this.pluginCustom.includeLayers) {
-        return BbPromise.all([
+        return Promise.all([
           this.pruneFunctions(),
           this.pruneLayers()
         ]);
@@ -135,11 +199,11 @@ class Prune {
 
       return this.pruneFunctions();
     } else {
-      return BbPromise.resolve();
+      return Promise.resolve();
     }
   }
 
-  pruneLayers() {
+  async pruneLayers() {
     const selectedLayers = this.options.layer ? [this.options.layer] : this.serverless.service.getAllLayers();
     const layerNames = selectedLayers.map(key => this.serverless.service.getLayer(key).name || key);
 
@@ -148,36 +212,29 @@ class Prune {
       'Pruning layer versions'
     );
 
-    return BbPromise.mapSeries(layerNames, layerName => {
-
-      return BbPromise.join(
-        this.listVersionsForLayer(layerName),
-        (versions) => ({ name: layerName, versions: versions })
-      );
-
-    }).each(({ name, versions }) => {
+    for (const layerName of layerNames) {
+      const versions = await this.listVersionsForLayer(layerName);
       if (!versions.length) {
-        return BbPromise.resolve();
+        continue;
       }
 
       const deletionCandidates = this.selectPruneVersionsForLayer(versions);
       if (deletionCandidates.length > 0) {
-        this.updateProgress('prune-plugin-prune-layers', `Pruning layer versions (${name})`);
+        this.updateProgress('prune-plugin-prune-layers', `Pruning layer versions (${layerName})`);
       }
 
       if (this.options.dryRun) {
-        this.printPruningCandidates(name, deletionCandidates);
-        return BbPromise.resolve();
+        this.printPruningCandidates(layerName, deletionCandidates);
       } else {
-        return this.deleteVersionsForLayer(name, deletionCandidates);
+        await this.deleteVersionsForLayer(layerName, deletionCandidates);
       }
-    }).then(() => {
-      this.clearProgress('prune-plugin-prune-layers');
-      this.logSuccess('Pruning of layers complete');
-    });
+    }
+
+    this.clearProgress('prune-plugin-prune-layers');
+    this.logSuccess('Pruning of layers complete');
   }
 
-  pruneFunctions() {
+  async pruneFunctions() {
     const selectedFunctions = this.options.function ? [this.options.function] : this.serverless.service.getAllFunctions();
     const functionNames = selectedFunctions.map(key => this.serverless.service.getFunction(key).name);
 
@@ -186,74 +243,66 @@ class Prune {
       'Pruning function versions'
     );
 
-    return BbPromise.mapSeries(functionNames, functionName => {
-
-      return BbPromise.join(
+    for (const functionName of functionNames) {
+      const [versions, aliases] = await Promise.all([
         this.listVersionForFunction(functionName),
-        this.listAliasesForFunction(functionName),
-        (versions, aliases) => ( { name: functionName, versions: versions, aliases: aliases } )
-      );
-
-    }).each(({ name, versions, aliases }) => {
+        this.listAliasesForFunction(functionName)
+      ]);
       if (!versions.length) {
-        return BbPromise.resolve();
+        continue;
       }
 
       const deletionCandidates = this.selectPruneVersionsForFunction(versions, aliases);
       if (deletionCandidates.length > 0) {
-        this.updateProgress('prune-plugin-prune-functions', `Pruning function versions (${name})`);
+        this.updateProgress('prune-plugin-prune-functions', `Pruning function versions (${functionName})`);
       }
 
       if (this.options.dryRun) {
-        this.printPruningCandidates(name, deletionCandidates);
-        return BbPromise.resolve();
+        this.printPruningCandidates(functionName, deletionCandidates);
       } else {
-        return this.deleteVersionsForFunction(name, deletionCandidates);
+        await this.deleteVersionsForFunction(functionName, deletionCandidates);
       }
-    }).then(() => {
-      this.clearProgress('prune-plugin-prune-functions');
-      this.logSuccess('Pruning of functions complete');
-    });
+    }
+
+    this.clearProgress('prune-plugin-prune-functions');
+    this.logSuccess('Pruning of functions complete');
   }
 
   deleteVersionsForLayer(layerName, versions) {
-    return BbPromise.each(versions, version => {
+    return pMap(versions, async (version) => {
       this.logInfo(`Deleting layer version ${layerName}:${version}.`);
-
       const params = {
         LayerName: layerName,
         VersionNumber: version
       };
-
-      return BbPromise.resolve()
-        .then(() => this.provider.request('Lambda', 'deleteLayerVersion', params))
-        .catch(e => {
-          throw e;
-        });
+      await lambdaRequest(this.provider, 'deleteLayerVersion', params);
     });
   }
 
   deleteVersionsForFunction(functionName, versions) {
-    return BbPromise.each(versions, version => {
+    return pMap(versions, async (version) => {
       this.logInfo(`Deleting function version ${functionName}:${version}.`);
-
       const params = {
         FunctionName: functionName,
         Qualifier: version
       };
-
-      return BbPromise.resolve()
-        .then(() => this.provider.request('Lambda', 'deleteFunction', params))
-        .catch(e => {
-          //ignore if trying to delete replicated lambda edge function
-          if (e.providerError && e.providerError.statusCode === 400
-            && e.providerError.message.startsWith('Lambda was unable to delete')
-            && e.providerError.message.indexOf('because it is a replicated function.') > -1) {
-            this.logWarning(`Unable to delete replicated Lambda@Edge function version ${functionName}:${version}.`);
-          } else {
-            throw e;
-          }
-        });
+      try {
+        await lambdaRequest(this.provider, 'deleteFunction', params);
+      } catch (e) {
+        //ignore if trying to delete replicated lambda edge function.
+        //Works for serverless v3 (provider.request: e.providerError) and
+        //osls v4 / AWS SDK v3 (e.$metadata + e.message).
+        const httpStatus = (e.providerError && e.providerError.statusCode) || (e.$metadata && e.$metadata.httpStatusCode);
+        const message = (e.providerError && e.providerError.message) || e.message;
+        if (httpStatus === 400
+          && message
+          && message.startsWith('Lambda was unable to delete')
+          && message.indexOf('because it is a replicated function.') > -1) {
+          this.logWarning(`Unable to delete replicated Lambda@Edge function version ${functionName}:${version}.`);
+        } else {
+          throw e;
+        }
+      }
     });
   }
 
@@ -303,14 +352,14 @@ class Prune {
       Array.prototype.push.apply(results, responseMapping(response));
 
       if (response.NextMarker) {
-        return this.provider.request('Lambda', action, Object.assign({}, params, { Marker: response.NextMarker }))
+        return lambdaRequest(this.provider,action, Object.assign({}, params, { Marker: response.NextMarker }))
           .then(responseHandler);
       } else {
-        return BbPromise.resolve(results);
+        return Promise.resolve(results);
       }
     };
 
-    return this.provider.request('Lambda', action, params)
+    return lambdaRequest(this.provider,action, params)
       .then(responseHandler);
   }
 
