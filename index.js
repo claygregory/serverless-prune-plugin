@@ -1,6 +1,39 @@
 'use strict';
 
 const BbPromise = require('bluebird');
+const { LambdaClient } = require('@aws-sdk/client-lambda');
+
+/**
+ * Invoke a Lambda AWS API method in a framework-aware way.
+ * osls v4 removed provider.request() (throws AWS_SDK_V2_SURFACE_REMOVED);
+ * there a LambdaClient is built from provider.getAwsSdkV3Config() and the
+ * matching <Method>Command is sent. On serverless v3 the original
+ * provider.request() surface is kept as-is. LambdaClients are cached per
+ * provider via a WeakMap.
+ */
+const lambdaClientPromises = new WeakMap();
+function lambdaRequest(provider, action, params) {
+  if (typeof provider.getAwsSdkV3Config !== 'function') {
+    return provider.request('Lambda', action, params);
+  }
+  let clientPromise = lambdaClientPromises.get(provider);
+  if (!clientPromise) {
+    clientPromise = provider.getAwsSdkV3Config().then((cfg) => new LambdaClient(cfg));
+    lambdaClientPromises.set(provider, clientPromise);
+  }
+  return clientPromise.then((client) => {
+    // AWS SDK v3 Command classes are PascalCase (e.g. ListVersionsByFunctionCommand),
+    // while the v2 provider.request() action names are camelCase (e.g. listVersionsByFunction).
+    const commandName = action.charAt(0).toUpperCase() + action.slice(1) + 'Command';
+    const Command = require('@aws-sdk/client-lambda')[commandName];
+    if (typeof Command !== 'function') {
+      throw new Error(
+        `Unsupported Lambda action: ${action} (@aws-sdk/client-lambda does not export ${commandName})`
+      );
+    }
+    return client.send(new Command(params));
+  });
+}
 
 class Prune {
   constructor(serverless, options, { log, progress } = {}) {
@@ -226,7 +259,7 @@ class Prune {
       };
 
       return BbPromise.resolve()
-        .then(() => this.provider.request('Lambda', 'deleteLayerVersion', params))
+        .then(() => lambdaRequest(this.provider,'deleteLayerVersion', params))
         .catch(e => {
           throw e;
         });
@@ -243,7 +276,7 @@ class Prune {
       };
 
       return BbPromise.resolve()
-        .then(() => this.provider.request('Lambda', 'deleteFunction', params))
+        .then(() => lambdaRequest(this.provider,'deleteFunction', params))
         .catch(e => {
           //ignore if trying to delete replicated lambda edge function
           if (e.providerError && e.providerError.statusCode === 400
@@ -303,14 +336,14 @@ class Prune {
       Array.prototype.push.apply(results, responseMapping(response));
 
       if (response.NextMarker) {
-        return this.provider.request('Lambda', action, Object.assign({}, params, { Marker: response.NextMarker }))
+        return lambdaRequest(this.provider,action, Object.assign({}, params, { Marker: response.NextMarker }))
           .then(responseHandler);
       } else {
         return BbPromise.resolve(results);
       }
     };
 
-    return this.provider.request('Lambda', action, params)
+    return lambdaRequest(this.provider,action, params)
       .then(responseHandler);
   }
 
